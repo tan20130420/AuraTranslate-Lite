@@ -1,0 +1,222 @@
+{
+  "manifest_version": 3,
+  "name": "AuraTranslate Lite",
+  "version": "0.5.1",
+  "description": "YouTube 双语字幕 + 网页/划词翻译 + 本地生词本与四档复习。免 Key 内置翻译源，数据只存在本机。",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "auratranslate@cai2761m.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "websiteContent",
+          "authenticationInfo"
+        ]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "142.0"
+    }
+  },
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*",
+    "https://*/*",
+    "http://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "scripts": [
+      "src/shared-settings.js",
+      "src/shared-api.js",
+      "src/shared-runtime.js",
+      "src/shared-text.js",
+      "src/shared-captions.js",
+      "src/shared-translation.js",
+      "src/shared-segmentation.js",
+      "src/shared-vocabulary.js",
+      "src/shared.js",
+      "src/background-core.js",
+      "src/background-subtitles.js",
+      "src/background-immersive.js",
+      "src/background-google.js",
+      "src/background-requests.js",
+      "src/background-bing.js",
+      "src/background-mymemory.js",
+      "src/background-dictionary.js",
+      "src/background-cache.js",
+      "src/background-vocabulary.js",
+      "src/background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
+      ],
+      "js": [
+        "src/shared-settings.js",
+        "src/shared-api.js",
+        "src/shared-runtime.js",
+        "src/shared-text.js",
+        "src/shared-captions.js",
+        "src/shared-translation.js",
+        "src/shared-segmentation.js",
+        "src/shared-vocabulary.js",
+        "src/shared.js",
+        "src/ui/react-vendor.js",
+        "src/ui/content-ui.js",
+        "src/content-core.js",
+        "src/content-captions.js",
+        "src/content-translation.js",
+        "src/content-player.js",
+        "src/content-overlay.js",
+        "src/content-hover.js",
+        "src/content-controls.js",
+        "src/content-main.js"
+      ],
+      "css": [
+        "src/overlay.css",
+        "src/player-controls.css"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://youtube.googleapis.com/embed/*"
+      ],
+      "js": [
+        "src/shared-settings.js",
+        "src/shared-api.js",
+        "src/shared-runtime.js",
+        "src/shared-text.js",
+        "src/shared-captions.js",
+        "src/shared-translation.js",
+        "src/shared-segmentation.js",
+        "src/shared-vocabulary.js",
+        "src/shared.js",
+        "src/ui/react-vendor.js",
+        "src/ui/content-ui.js",
+        "src/content-core.js",
+        "src/content-captions.js",
+        "src/content-translation.js",
+        "src/content-player.js",
+        "src/content-overlay.js",
+        "src/content-hover.js",
+        "src/content-main.js"
+      ],
+      "css": [
+        "src/overlay.css"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://drive.google.com/file/*"
+      ],
+      "js": [
+        "src/shared-settings.js",
+        "src/shared-api.js",
+        "src/shared-runtime.js",
+        "src/shared-text.js",
+        "src/shared-captions.js",
+        "src/shared-translation.js",
+        "src/shared-segmentation.js",
+        "src/shared-vocabulary.js",
+        "src/shared.js",
+        "src/drive.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/shared-settings.js",
+        "src/shared-api.js",
+        "src/shared-runtime.js",
+        "src/shared-text.js",
+        "src/shared-captions.js",
+        "src/shared-translation.js",
+        "src/shared-segmentation.js",
+        "src/shared-vocabulary.js",
+        "src/shared.js",
+        "src/ui/react-vendor.js",
+        "src/ui/content-ui.js",
+        "src/immersive-core.js",
+        "src/immersive-controls.js",
+        "src/immersive-dom.js",
+        "src/immersive-render.js",
+        "src/immersive-translation.js",
+        "src/immersive.js"
+      ],
+      "css": [
+        "src/immersive.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "src/shared-settings.js",
+        "src/shared-api.js",
+        "src/shared-runtime.js",
+        "src/shared-text.js",
+        "src/shared-captions.js",
+        "src/shared-translation.js",
+        "src/shared-segmentation.js",
+        "src/shared-vocabulary.js",
+        "src/shared.js",
+        "src/ui/react-vendor.js",
+        "src/ui/content-ui.js",
+        "src/selection.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/page-bridge.js",
+        "icons/icon-32.png"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*"
+      ]
+    }
+  ],
+  "options_page": "options/options.html",
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "AuraTranslate",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  }
+}

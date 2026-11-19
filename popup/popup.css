@@ -1,0 +1,541 @@
+@import url("../ui/shared/theme.css");
+
+/* Popup. One quiet surface, one card of inputs, one aurora action. Colour
+   comes only from ui/shared/theme.css tokens. */
+
+html, body {
+    width: 380px;
+    max-width: 100vw;
+    min-width: 300px;
+}
+
+body {
+    overflow-x: hidden;
+    background: var(--canvas);
+}
+
+.popup {
+    position: relative;
+    isolation: isolate;
+    padding: 18px 18px 10px;
+    animation: popup-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popup-enter {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+/* A soft aurora wash at the top of the popup: colour as light, not as a block. */
+.popup-glow {
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: 150px;
+    background: radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--aurora-1) 16%, transparent) 0%, transparent 60%),
+    radial-gradient(90% 80% at 100% 0%, color-mix(in srgb, var(--aurora-2) 13%, transparent) 0%, transparent 65%);
+    pointer-events: none;
+}
+
+/* ---------- Header ---------- */
+.popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.header-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 2px;
+}
+
+.icon-button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+}
+
+.icon-button:hover:not(:disabled) {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-sm);
+}
+
+.icon-button .ui-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ---------- Input card ---------- */
+.control-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.language-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr);
+    align-items: end;
+    gap: 4px;
+    padding: 12px 12px 10px;
+}
+
+.select-field {
+    display: block;
+    min-width: 0;
+}
+
+.select-field > span, legend {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.language-pair .select-field > span {
+    padding-left: 8px;
+}
+
+select {
+    width: 100%;
+    height: 38px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background-color: transparent;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+select:hover:not(:disabled) {
+    background-color: var(--subtle);
+}
+
+select:focus {
+    border-color: var(--accent);
+    background-color: var(--surface);
+}
+
+.language-pair select {
+    font-size: 15.5px;
+    font-weight: 650;
+    letter-spacing: -0.2px;
+}
+
+.direction {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 5px;
+    border-radius: 50%;
+    background: var(--aurora-gradient-soft);
+    color: var(--accent-text);
+}
+
+.direction .ui-icon {
+    width: 15px;
+    height: 15px;
+}
+
+.service-card {
+    border-top: 1px solid var(--border);
+}
+
+.service-field {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px 4px 20px;
+}
+
+.service-field + .service-field {
+    border-top: 1px dashed var(--border);
+}
+
+.service-field > span {
+    margin: 0;
+}
+
+.service-field select {
+    height: 36px;
+}
+
+.model-hint {
+    grid-column: 1 / -1;
+    display: block;
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--soft);
+    color: var(--accent-text);
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* ---------- Actions ---------- */
+.translate-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.mode-toggle {
+    display: flex;
+    flex: 0 0 76px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    height: 48px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+    color: var(--accent-text);
+}
+
+.mode-toggle:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    background: var(--soft);
+}
+
+#mode-icon {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.mode-label {
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 500;
+}
+
+.primary {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 0;
+    height: 48px;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(100deg, var(--aurora-1) 0%, var(--aurora-2) 100%);
+    background-size: 160% 160%;
+    background-position: 0% 50%;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    box-shadow: var(--aurora-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    transition: background-position 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.primary:hover:not(:disabled) {
+    background-position: 100% 50%;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--aurora-1) 32%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    transform: translateY(-1px);
+}
+
+.primary:active:not(:disabled) {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.primary .ui-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.button-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: button-spin 0.7s linear infinite;
+}
+
+@keyframes button-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Only real feedback (errors, progress, unsaved notices) takes space; the
+   idle hint is empty so the region collapses without losing its live role. */
+.status {
+    min-height: 18px;
+    margin: 10px 4px 12px;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.6;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.status:empty {
+    display: none;
+}
+
+.status[data-error="true"] {
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--danger-soft);
+    color: var(--danger);
+    text-align: left;
+}
+
+/* ---------- Footer ---------- */
+.popup-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+}
+
+.text-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.text-button:hover:not(:disabled) {
+    background: var(--subtle);
+    color: var(--ink);
+}
+
+.text-button .ui-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.chevron {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[aria-expanded="true"] .chevron {
+    transform: rotate(180deg);
+}
+
+/* "网站与偏好" is a second screen, not an expansion: both together exceed
+   Chrome's 600px action height limit. */
+.more-open .translation-controls .control-card,
+.more-open .translate-actions,
+.more-open .status {
+    display: none;
+}
+
+.more-panel {
+    padding-top: 14px;
+    animation: more-panel-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes more-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+fieldset {
+    min-width: 0;
+    margin: 0 0 16px;
+    padding: 0;
+    border: 0;
+}
+
+legend {
+    padding: 0 2px;
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.site-name {
+    margin: 0 0 8px;
+    padding: 0 2px;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 11.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.segmented {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--subtle);
+}
+
+.segmented button {
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.segmented button span {
+    margin-left: 6px;
+}
+
+.segmented button:hover:not([aria-pressed="true"]) {
+    color: var(--ink);
+}
+
+.segmented button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--accent-text);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-card {
+    overflow: hidden;
+}
+
+.popup-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.popup-toggle:hover {
+    background: var(--subtle);
+}
+
+.popup-toggle + .popup-toggle {
+    border-top: 1px solid var(--border);
+}
+
+.popup-toggle small {
+    display: block;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 400;
+}
+
+.popup-toggle input {
+    appearance: none;
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    margin: 0;
+    border: 0;
+    border-radius: 20px;
+    background: var(--input-border);
+    cursor: pointer;
+}
+
+.popup-toggle input::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+    transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.popup-toggle input:checked {
+    background: var(--aurora-gradient);
+}
+
+.popup-toggle input:checked::before {
+    transform: translateX(16px);
+}
+
+@media (max-width: 340px) {
+    .popup {
+        padding: 14px 12px 8px;
+    }
+
+    .version {
+        display: none;
+    }
+
+    .language-pair {
+        grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+        padding: 10px 8px 8px;
+    }
+
+    .direction {
+        width: 22px;
+        height: 22px;
+    }
+
+    .language-pair select {
+        font-size: 14px;
+    }
+
+    .service-field {
+        padding-left: 16px;
+        padding-right: 8px;
+    }
+
+    .mode-toggle {
+        flex-basis: 64px;
+    }
+}
