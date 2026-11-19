@@ -85,6 +85,7 @@ export function settingsPatch(settings) {
         "translationJsonResponse",
         "immersiveDeepContextEnabled",
         "selectionTranslationEnabled",
+        "selectionAutoTranslate",
         "llmSentenceSegmentationEnabled",
         "asrCorrectionEnabled",
         "showOriginalTechnicalTerms",

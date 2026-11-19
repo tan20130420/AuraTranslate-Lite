@@ -42,6 +42,13 @@ function hoverVideo() {
     return state.video || document.querySelector("video");
 }
 
+// 划词进行中（左键按下或选区未清空）时不要再弹单词浮层，
+// 否则浮层会挡住选区，或与划词译文卡片叠在一起。
+function hoverSelectionBusy() {
+    const selection = window.getSelection && window.getSelection();
+    return Boolean(selection && !selection.isCollapsed);
+}
+
 function hoverPauseAllowed() {
     const settings = state.settings || {};
     return settings.hoverPauseEnabled !== false;
@@ -387,6 +394,14 @@ function hoverLookupWord(word, range, x, y) {
 
 function hoverTrackWord(event) {
     if (!hoverLookupAllowed()) return;
+    // 左键按住拖动或页面已有选区时，不查词也不弹浮层。
+    // 这样拖选字幕时不会被词语释义打断，松开后的译文卡片也不会被词卡盖住。
+    if ((event && (event.buttons & 1)) || hoverSelectionBusy()) {
+        clearTimeout(hoverWordTimer);
+        hoverPendingWord = "";
+        hoverScheduleHideTip();
+        return;
+    }
     const hit = hoverWordAtPoint(event.clientX, event.clientY);
     if (!hit) {
         // 指针还在字幕里、只是落在了词外（两行之间、标点、空格），
@@ -513,12 +528,25 @@ function bindHoverInteractions() {
     document.addEventListener("mouseout", hoverHandleOut, true);
     document.addEventListener("mousemove", hoverHandleMove, true);
     document.addEventListener("mouseleave", hoverHandleLeaveWindow, true);
+    // 开始拖选时立刻收掉已有词卡，并取消尚未触发的查词。
+    document.addEventListener("pointerdown", () => {
+        clearTimeout(hoverWordTimer);
+        hoverPendingWord = "";
+        hoverHideTip();
+    }, true);
     if (window && typeof window.addEventListener === "function") {
         window.addEventListener("scroll", hoverHideTip, true);
         window.addEventListener("resize", hoverHideTip);
     }
     hoverBindPlayWatcher();
 }
+
+// 供划词模块在译文卡片打开/关闭时登记同一个暂停区域。
+globalThis.YTBTHover = {
+    suspend: hoverSuspend,
+    release: hoverRelease,
+    hideTip: hoverHideTip,
+};
 
 try {
     bindHoverInteractions();

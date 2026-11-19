@@ -41,7 +41,7 @@ function line(text, className = "ytbt-en") {
     return {node, element};
 }
 
-function load({video, settings = {}, caretTarget = null, lookup = null} = {}) {
+function load({video, settings = {}, caretTarget = null, lookup = null, selectionBusy = false} = {}) {
     const listeners = {document: [], window: []};
     const created = [];
     const highlights = new Map();
@@ -97,6 +97,7 @@ function load({video, settings = {}, caretTarget = null, lookup = null} = {}) {
     const window = {
         innerWidth: 1200,
         innerHeight: 800,
+        getSelection() { return {isCollapsed: !selectionBusy}; },
         addEventListener(type, handler) { listeners.window.push([type, handler]); },
     };
 
@@ -234,6 +235,19 @@ test("悬浮字幕列表的原文也能取词", () => {
     const hit = api.hoverWordAtPoint(400, 510);
     assert.ok(hit, "字幕列表原文应当能取词");
     assert.equal(hit.word, "resilient");
+});
+
+test("拖拽选区或选区未清空时不弹单词浮层", () => {
+    const text = "She stayed resilient after the setback.";
+    const {node} = line(text, "ytbt-cue-source");
+    const offset = text.indexOf("resilient") + 3;
+    const dragging = load({video: fakeVideo(), caretTarget: {node, offset}});
+    dragging.api.hoverTrackWord({clientX: 400, clientY: 510, buttons: 1});
+    assert.equal(dragging.sent.length, 0, "按住左键拖动时不应查词");
+
+    const selected = load({video: fakeVideo(), caretTarget: {node, offset}, selectionBusy: true});
+    selected.api.hoverTrackWord({clientX: 400, clientY: 510, buttons: 0});
+    assert.equal(selected.sent.length, 0, "选区存在时不应与译文卡片抢交互");
 });
 
 test("光标停在词尾空白时取左边的词", () => {

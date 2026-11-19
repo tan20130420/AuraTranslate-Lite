@@ -61,7 +61,7 @@ function SelectionToolbar({toolbar, copied, toolbarError, onAction}) {
     );
 }
 
-function SelectionCard({selection, result, translating, saving, saved, error, onAction}) {
+function SelectionCard({selection, result, translating, saving, saved, error, onAction, pinned, copiedText}) {
     return (
         <section className="surface selection-card" role="dialog" aria-label="划词翻译">
             <header>
@@ -81,9 +81,24 @@ function SelectionCard({selection, result, translating, saving, saved, error, on
                 ) : !translating ? (
                     <button type="button" className="retry" onClick={() => onAction("retry")}>重试翻译</button>
                 ) : null}
+                {result && !pinned && (
+                    <button type="button" className="pin" data-action="pin"
+                            onClick={() => onAction("pin")}>固定译文</button>
+                )}
+                {pinned && (
+                    <>
+                        <button type="button" className="pin" data-action="copy-source"
+                                onClick={() => onAction("copy-source")}>复制原文</button>
+                        <button type="button" className="pin" data-action="copy-translation"
+                                onClick={() => onAction("copy-translation")}>复制译文</button>
+                        <button type="button" className="pin" data-action="unpin"
+                                onClick={() => onAction("unpin")}>取消固定</button>
+                    </>
+                )}
                 <button type="button" className="book" onClick={() => onAction("book")}>打开生词本</button>
             </div>
             {saved && <p className="hint">已保存原文、译文、上下文和来源。</p>}
+            {copiedText && <p className="hint">已复制{copiedText === "source" ? "原文" : "译文"}。</p>}
         </section>
     );
 }

@@ -5,9 +5,10 @@
     "use strict";
     const Core = globalThis.YTBTCore;
     if (!Core || !globalThis.chrome?.runtime || globalThis.YTBTSelection) return;
-    const state = {ready: false, enabled: true, revision: 0, selection: null, host: null,
-        shadow: null, container: null, view: null, result: null, translating: false, saving: false,
-        saved: false, error: "", toolbar: Core.normalizeSelectionToolbar(), copied: false, toolbarError: ""};
+    const state = {ready: false, enabled: true, autoTranslate: true, selecting: false, revision: 0,
+        selection: null, host: null, shadow: null, container: null, view: null, result: null,
+        translating: false, saving: false, saved: false, error: "",
+        toolbar: Core.normalizeSelectionToolbar(), copied: false, toolbarError: "", pinned: []};
     globalThis.YTBTSelection = {state, dismiss};
     let timer;
     const EDITABLE = "input,textarea,select,[contenteditable]:not([contenteditable='false']),[role='textbox']";
@@ -17,19 +18,48 @@
         if (!result?.ok) throw new Error(result?.error || "扩展未返回结果，请重试。");
         return result;
     });
+    const hover = () => globalThis.YTBTHover;
+    const suspendVideo = () => hover()?.suspend("selection");
+    const releaseVideo = () => hover()?.release("selection");
+
+    async function copyInto(shadow, text) {
+        if (!text) return false;
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (_) {
+            // fall through to the synchronous fallback below
+        }
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.readOnly = true;
+        area.style.cssText = "position:fixed!important;left:0!important;top:0!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important";
+        const parent = shadow || document.body;
+        parent.appendChild(area);
+        try {
+            area.select();
+            return Boolean(document.execCommand && document.execCommand("copy"));
+        } finally {
+            area.remove();
+        }
+    }
 
     function dismiss() {
         clearTimeout(timer);
         state.revision++;
+        const hadHost = Boolean(state.host);
         state.host?.remove();
         const view = state.view;
         state.view = null;
         Object.assign(state, {host: null, shadow: null, container: null, selection: null, result: null,
             translating: false, saving: false, saved: false, error: "", copied: false, toolbarError: ""});
+        if (hadHost) releaseVideo();
         if (view) view.unmount();
     }
 
-    function readSelection() {
+    function readSelection(anchor) {
         const selection = window.getSelection();
         if (!selection?.rangeCount || selection.isCollapsed || elementOf(document.activeElement)?.closest(EDITABLE)) return null;
         const range = selection.getRangeAt(0);
@@ -47,31 +77,34 @@
         const index = context.toLowerCase().indexOf(sourceText.toLowerCase());
         const offset = Math.max(0, index - 600);
         return {sourceText, originalText, contextText: context.slice(offset, offset + 1800),
-            sourceUrl: location.href, sourceTitle: document.title, rect};
+            sourceUrl: location.href, sourceTitle: document.title, rect, anchor: anchor || null};
     }
 
-    function capture() {
-        if (!state.ready || !state.enabled) return;
+    function capture(anchor) {
+        if (!state.ready || !state.enabled) return false;
         // Selecting/copying the result or focusing its buttons keeps the card open.
         if (document.activeElement === state.host || window.getSelection()?.anchorNode?.getRootNode() === state.shadow ||
-            state.host?.contains(window.getSelection()?.anchorNode)) return;
-        const selection = readSelection();
-        if (!selection) { if (state.host && !state.translating) dismiss(); return; }
+            state.host?.contains(window.getSelection()?.anchorNode)) return false;
+        const selection = readSelection(anchor);
+        if (!selection) { if (state.host && !state.translating) dismiss(); return false; }
         if (state.selection?.originalText === selection.originalText && state.selection?.contextText === selection.contextText &&
             state.selection?.sourceUrl === selection.sourceUrl) {
             state.selection.rect = selection.rect;
+            if (anchor) state.selection.anchor = anchor;
             position();
-            return;
+            return false;
         }
         dismiss();
         state.selection = selection;
         mount();
         render();
+        return true;
     }
 
-    function schedule() {
+    function schedule(anchor) {
         clearTimeout(timer);
-        timer = setTimeout(capture, 160);
+        if (state.selecting) return;
+        timer = setTimeout(() => capture(anchor), 160);
     }
 
     function mount() {
@@ -84,6 +117,7 @@
         state.container = document.createElement("div");
         state.shadow.append(state.container);
         document.documentElement.append(host);
+        suspendVideo();
         if (globalThis.AuraContentUI) {
             state.view = globalThis.AuraContentUI.mountSelection(state.container, selectionProps());
         }
@@ -101,6 +135,8 @@
             saved: state.saved,
             error: state.error,
             copied: state.copied,
+            copiedText: "",
+            pinned: false,
             toolbarError: state.toolbarError,
             onAction: handleSelectionAction
         };
@@ -111,7 +147,104 @@
         else if (action === "copy") copySelection();
         else if (action === "vocabulary" || action === "book") openBook();
         else if (action === "save") saveWord();
+        else if (action === "pin") pinCurrent();
         else if (action === "dismiss") dismiss();
+    }
+
+    function pinnedProps(entry) {
+        return {
+            mode: "card",
+            toolbar: state.toolbar,
+            selection: entry.selection,
+            result: entry.result,
+            translating: false,
+            saving: entry.saving,
+            saved: entry.saved,
+            error: entry.error,
+            copied: false,
+            copiedText: entry.copiedText,
+            pinned: true,
+            toolbarError: "",
+            onAction: (action) => handlePinnedAction(entry, action)
+        };
+    }
+
+    function renderPinned(entry) {
+        if (!entry || !entry.shadow || !entry.view) return;
+        entry.view.update(pinnedProps(entry));
+    }
+
+    function mountPinned(entry) {
+        const host = document.createElement("div");
+        host.dataset.ytbtSelectionRoot = "";
+        host.dataset.ytbtSelectionPinned = "";
+        host.style.cssText = "all:initial!important;position:fixed!important;top:12px!important;right:12px!important;z-index:2147483646!important;pointer-events:none!important;max-width:calc(100vw - 24px)!important;";
+        entry.host = host;
+        entry.shadow = host.attachShadow({mode: "open"});
+        entry.container = document.createElement("div");
+        entry.shadow.append(entry.container);
+        document.documentElement.append(host);
+        if (globalThis.AuraContentUI) {
+            entry.view = globalThis.AuraContentUI.mountSelection(entry.container, pinnedProps(entry));
+        }
+    }
+
+    function unpin(entry) {
+        const index = state.pinned.indexOf(entry);
+        if (index < 0) return;
+        state.pinned.splice(index, 1);
+        entry.host?.remove();
+        entry.view?.unmount();
+    }
+
+    function pinCurrent() {
+        if (!state.selection || !state.result) return;
+        const entry = {
+            selection: {...state.selection, anchor: null, rect: null},
+            result: {...state.result},
+            saving: false, saved: state.saved, error: "", copiedText: ""
+        };
+        mountPinned(entry);
+        state.pinned.push(entry);
+        dismiss();
+    }
+
+    function handlePinnedAction(entry, action) {
+        if (action === "dismiss" || action === "unpin") unpin(entry);
+        else if (action === "book") openBook();
+        else if (action === "save") savePinnedWord(entry);
+        else if (action === "copy-source") copyPinned(entry, "source");
+        else if (action === "copy-translation") copyPinned(entry, "translation");
+    }
+
+    async function savePinnedWord(entry) {
+        if (!entry || !entry.result || entry.saving || entry.saved) return;
+        entry.saving = true;
+        entry.error = "";
+        renderPinned(entry);
+        try {
+            await send({type: "VOCABULARY", action: "add", entry: entry.result});
+            entry.saved = true;
+        } catch (error) {
+            entry.error = `收藏失败：${error.message}`;
+        } finally {
+            entry.saving = false;
+            renderPinned(entry);
+        }
+    }
+
+    async function copyPinned(entry, kind) {
+        if (!entry) return;
+        const text = kind === "source" ? entry.selection?.originalText : entry.result?.translatedText;
+        try {
+            const ok = await copyInto(entry.shadow, text);
+            entry.copiedText = ok ? kind : "";
+            entry.error = ok ? "" : "无法复制，请使用系统复制菜单或 Ctrl/Cmd+C。";
+        } catch (_) {
+            entry.copiedText = "";
+            entry.error = "无法复制，请使用系统复制菜单或 Ctrl/Cmd+C。";
+        }
+        renderPinned(entry);
     }
 
     function render() {
@@ -141,8 +274,13 @@
         const surface = state.shadow.querySelector(".surface");
         const isToolbar = surface.classList.contains("selection-toolbar");
         const width = surface.offsetWidth || (isToolbar ? 28 : 360), height = surface.offsetHeight || (isToolbar ? 28 : 44);
-        state.host.style.setProperty("left", `${Math.max(leftEdge + 8, Math.min(rect.right, rightEdge - width - 8))}px`, "important");
-        const below = rect.bottom + 6, above = rect.top - height - 6;
+        // 译文卡片跟随松开左键的位置，跨行长句不会跑到选区末尾；
+        // 工具栏仍按选区矩形定位，保持原有手动模式体验。
+        const anchor = !isToolbar && state.selection.anchor;
+        const leftRef = anchor ? anchor.x : rect.right;
+        const below = anchor ? anchor.y + 14 : rect.bottom + 6;
+        const above = anchor ? anchor.y - height - 14 : rect.top - height - 6;
+        state.host.style.setProperty("left", `${Math.max(leftEdge + 8, Math.min(leftRef, rightEdge - width - 8))}px`, "important");
         const preferAbove = isToolbar && state.toolbar.position === "above";
         const top = preferAbove ? (above >= topEdge + 8 ? above : below) :
             (below + height <= bottomEdge - 8 ? below : above);
@@ -226,13 +364,44 @@
         }
     }
 
+    const inOwnUI = (event) => {
+        const path = event.composedPath ? event.composedPath() : [];
+        return path.some(node => node === state.host || (node && node.dataset && node.dataset.ytbtSelectionPinned !== undefined));
+    };
+
+    function handlePointerUp(event) {
+        if (event.button !== undefined && event.button !== 0) { schedule(); return; }
+        const wasSelecting = state.selecting;
+        state.selecting = false;
+        if (!wasSelecting) { schedule(); return; }
+        const anchor = {x: event.clientX || 0, y: event.clientY || 0};
+        if (state.autoTranslate && state.enabled) {
+            // 松开左键即把这次选区作为一整段翻译，不拆词。
+            clearTimeout(timer);
+            const previous = state.selection?.originalText;
+            capture(anchor);
+            if (state.selection && state.selection.originalText !== previous) translate();
+        } else {
+            schedule(anchor);
+        }
+    }
+
     document.addEventListener("selectionchange", schedule);
-    document.addEventListener("pointerup", schedule);
+    document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("keyup", (event) => {
         if (event.key === "Escape") dismiss();
-        else if (event.key.startsWith("Arrow") || event.key === "Shift") schedule();
+        else if (event.key.startsWith("Arrow") || event.key === "Shift") {
+            if (state.autoTranslate && state.enabled) {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    const previous = state.selection?.originalText;
+                    if (capture(null) && state.selection && state.selection.originalText !== previous) translate();
+                }, 200);
+            } else schedule();
+        }
     });
     document.addEventListener("pointerdown", (event) => {
+        if (event.button === 0 && !inOwnUI(event)) state.selecting = true;
         if (state.host && !event.composedPath().includes(state.host)) dismiss();
     }, true);
     document.addEventListener("scroll", (event) => {
@@ -240,6 +409,7 @@
     }, true);
     window.addEventListener("resize", position);
     window.addEventListener("blur", () => {
+        state.selecting = false;
         if (document.activeElement?.tagName === "IFRAME") dismiss();
     });
     window.visualViewport?.addEventListener("resize", position);
@@ -248,14 +418,17 @@
     chrome.storage.onChanged?.addListener((changes, area) => {
         if (area !== "local") return;
         if (changes.selectionTranslationEnabled) state.enabled = changes.selectionTranslationEnabled.newValue !== false;
+        if (changes.selectionAutoTranslate) state.autoTranslate = changes.selectionAutoTranslate.newValue !== false;
         if (changes.selectionToolbar) state.toolbar = Core.normalizeSelectionToolbar(changes.selectionToolbar.newValue);
         if (!state.enabled) dismiss();
         else if (changes.selectionToolbar) render();
     });
-    chrome.storage.local.get({selectionTranslationEnabled: true, selectionToolbar: Core.DEFAULT_SETTINGS.selectionToolbar}, (settings) => {
+    chrome.storage.local.get({selectionTranslationEnabled: true, selectionAutoTranslate: true,
+        selectionToolbar: Core.DEFAULT_SETTINGS.selectionToolbar}, (settings) => {
         const error = chrome.runtime.lastError;
         if (error) return;
         state.enabled = settings.selectionTranslationEnabled !== false;
+        state.autoTranslate = settings.selectionAutoTranslate !== false;
         state.toolbar = Core.normalizeSelectionToolbar(settings.selectionToolbar);
         state.ready = true;
         capture();

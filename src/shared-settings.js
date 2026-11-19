@@ -63,6 +63,8 @@
         immersiveSiteRules: {},
         immersiveDisabledSites: [],
         selectionTranslationEnabled: true,
+        // 松开左键即翻译整段选区；关闭后退回手动点击工具栏翻译按钮。
+        selectionAutoTranslate: true,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

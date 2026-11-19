@@ -29,7 +29,13 @@ export function SelectionSettings({settings, update, hidden, navigate}) {
                 <input id="selectionTranslationEnabled" type="checkbox"
                        checked={settings.selectionTranslationEnabled !== false}
                        onChange={(event) => update({selectionTranslationEnabled: event.target.checked})}/>
-                <span>启用划词翻译<small>选中文字后显示工具栏，点击翻译按钮才发起翻译。</small></span>
+                <span>启用划词翻译<small>关闭后完全不处理网页上的选中文字。</small></span>
+            </label>
+            <label className="toggle">
+                <input id="selectionAutoTranslate" type="checkbox"
+                       checked={settings.selectionAutoTranslate !== false}
+                       onChange={(event) => update({selectionAutoTranslate: event.target.checked})}/>
+                <span>松开左键即翻译<small>拖选单词、短语或句子后松开鼠标，立即翻译整段；关闭后需点击工具栏翻译按钮。</small></span>
             </label>
             <p className="section-note">
                 沿用扩展弹出窗口中的网页翻译服务和语言设置。使用 AI 服务时，会结合所选文字附近的上下文判断含义。
@@ -109,9 +115,9 @@ export function SelectionSettings({settings, update, hidden, navigate}) {
                 </fieldset>
             </div>
             <ol className="selection-guide">
-                <li>在网页上拖动鼠标或长按，选中需要翻译的文字。</li>
-                <li>点击选区旁的翻译图标查看译文。</li>
-                <li>点击“收藏到生词本”，保存原文、译文、上下文和来源。</li>
+                <li>在网页上按住左键拖选单词、短语或句子，松开后立即翻译整段。</li>
+                <li>译文卡片可“固定译文”，继续划选下一句，旧译文会保留在屏幕右上角。</li>
+                <li>点击“收藏到生词本”，把这一整段原文、译文、上下文和来源存为一条。</li>
             </ol>
             <button type="button" className="secondary" onClick={() => navigate("vocabulary")}>打开生词本</button>
         </section>

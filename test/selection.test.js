@@ -65,6 +65,63 @@ test("selection waits for a click, translates with context, saves and opens the 
     assert.ok(f.opened[0].url.endsWith("options/options.html#vocabulary"));
 });
 
+function pointerEvent(window, type, extra = {}) {
+    const event = new window.Event(type);
+    for (const [key, value] of Object.entries({button: 0, clientX: 150, clientY: 120, ...extra})) {
+        Object.defineProperty(event, key, {value, configurable: true});
+    }
+    return event;
+}
+
+test("releasing the left button translates the whole selected phrase automatically", async t => {
+    const f = await page(t);
+    const zones = [];
+    f.window.YTBTHover = {suspend: zone => zones.push(`+${zone}`), release: zone => zones.push(`-${zone}`), hideTip() {}};
+    f.select("finance", "bank offers");
+    await waitFor(() => f.shadow()?.querySelector(".selection-trigger"));
+    assert.equal(f.requests.length, 0);
+
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".translation")?.textContent === "译文 bank offers");
+    assert.equal(f.requests.length, 1);
+    assert.ok(zones.includes("+selection"), "译文卡片打开期间应登记暂停区域");
+});
+
+test("turning off auto translate restores the click-to-translate toolbar", async t => {
+    const f = await page(t, {selectionAutoTranslate: false});
+    f.select("finance", "bank");
+    await waitFor(() => f.shadow()?.querySelector(".selection-trigger"));
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await new Promise(resolve => setTimeout(resolve, 250));
+    assert.equal(f.requests.length, 0);
+    assert.ok(f.shadow()?.querySelector(".selection-trigger"), "仍应显示手动翻译按钮");
+});
+
+test("pinned translation stays while a new selection is translated", async t => {
+    const f = await page(t);
+    f.select("finance", "bank");
+    await waitFor(() => f.shadow()?.querySelector(".selection-trigger"));
+    f.shadow().querySelector(".selection-trigger").click();
+    await waitFor(() => f.shadow()?.querySelector(".translation")?.textContent === "银行");
+    f.shadow().querySelector('[data-action="pin"]').click();
+    const activeShadow = () => f.document.querySelector("[data-ytbt-selection-root]:not([data-ytbt-selection-pinned])")?.shadowRoot;
+    await waitFor(() => !activeShadow());
+
+    const pinnedHosts = () => [...f.document.querySelectorAll("[data-ytbt-selection-pinned]")];
+    assert.equal(pinnedHosts().length, 1);
+    assert.match(pinnedHosts()[0].shadowRoot.textContent, /银行/);
+
+    f.select("river", "bank");
+    await waitFor(() => activeShadow()?.querySelector(".selection-trigger"));
+    assert.equal(pinnedHosts().length, 1, "新选区不应顶掉已固定的译文");
+    assert.match(pinnedHosts()[0].shadowRoot.textContent, /银行/);
+
+    pinnedHosts()[0].shadowRoot.querySelector('[data-action="unpin"]').click();
+    await waitFor(() => pinnedHosts().length === 0);
+});
+
 test("a newer selection and dismissal invalidate late translation results", async t => {
     const f = await page(t);
     const pending = [];
