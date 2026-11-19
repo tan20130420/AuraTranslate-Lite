@@ -14,19 +14,53 @@ const script = fs.readFileSync(path.resolve(__dirname, "../src/selection.js"), "
     assert.ok(predicate(), "expected selection state did not arrive");
 };
 
+function installSpeechStub(window) {
+    const spoken = [];
+    let current = null;
+    window.SpeechSynthesisUtterance = class {
+        constructor(text) {
+            this.text = text;
+            this.lang = "";
+            this.rate = 1;
+            this.voice = null;
+        }
+    };
+    window.speechSynthesis = {
+        getVoices: () => [
+            {name: "Online EN", lang: "en-US", localService: false},
+            {name: "Local EN", lang: "en-GB", localService: true},
+            {name: "Local ZH", lang: "zh-CN", localService: true},
+        ],
+        cancel() { current = null; },
+        speak(utterance) {
+            spoken.push({text: utterance.text, lang: utterance.lang, rate: utterance.rate,
+                voice: utterance.voice?.name || ""});
+            current = utterance;
+        },
+    };
+    return {spoken, current: () => current, finish() {
+        const utterance = current;
+        current = null;
+        utterance?.onend?.();
+    }};
+}
+
 async function page(t, storage = {}) {
     const f = vocabularyFixture({storage});
-    const dom = new JSDOM(`<title>Reading guide</title><main><p id="finance">The bank offers savings accounts.</p><p id="river">We sat on the river bank.</p><p id="html">Literal &lt;img src=x onerror=alert(1)&gt; code.</p><div contenteditable="true" id="editor">private writing</div><input type="password" value="secret"></main>`,
+    const dom = new JSDOM(`<title>Reading guide</title><main><p id="finance">The bank offers savings accounts.</p><p id="river">We sat on the river bank.</p><p id="cn">这是一段中文文字。</p><p id="html">Literal &lt;img src=x onerror=alert(1)&gt; code.</p><div contenteditable="true" id="editor">private writing</div><input type="password" value="secret"></main>`,
         {url: "https://example.org/read", pretendToBeVisual: true, runScripts: "outside-only"});
     const {window} = dom;
     window.chrome = f.chrome;
+    const speech = installSpeechStub(window);
+    const zones = [];
+    window.YTBTHover = {suspend: zone => zones.push(`+${zone}`), release: zone => zones.push(`-${zone}`), hideTip() {}};
     window.Range.prototype.getBoundingClientRect = () => ({top: 60, bottom: 80, left: 20, right: 200, width: 180, height: 20});
     window.eval(source("shared"));
     window.eval(source("content-ui"));
     window.eval(script);
     t.after(() => window.close());
     await waitFor(() => window.YTBTSelection.state.ready);
-    return {...f, window, document: window.document,
+    return {...f, window, document: window.document, speech, zones,
         shadow: () => window.document.querySelector("[data-ytbt-selection-root]")?.shadowRoot,
         select(id, text) {
             const node = window.document.getElementById(id).firstChild;
@@ -350,4 +384,84 @@ test("toolbar settings preserve pending and completed translations and reset imm
     f.select("river", "bank");
     await waitFor(() => f.shadow()?.querySelector(".selection-trigger"));
     assert.equal(f.shadow().querySelectorAll(".selection-tool").length, 1);
+});
+
+test("releasing a selection reads the chosen text aloud with a local voice", async t => {
+    const f = await page(t);
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.select("finance", "bank offers");
+    assert.equal(f.speech.spoken.length, 0, "拖拽过程中不应提前朗读");
+
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".speak.speaking"));
+    assert.equal(f.speech.spoken.length, 1);
+    assert.equal(f.speech.spoken[0].text, "bank offers");
+    assert.equal(f.speech.spoken[0].lang, "en-GB", "本地语音应优先于在线语音");
+    assert.equal(f.speech.spoken[0].rate, 1);
+    assert.ok(f.zones.includes("+speech"), "朗读期间应暂停视频");
+});
+
+test("speaker toggles stop and replay, and Chinese text picks a Chinese voice", async t => {
+    const f = await page(t);
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.select("finance", "bank");
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".speak.speaking"));
+    assert.equal(f.speech.spoken[0].text, "bank");
+
+    f.shadow().querySelector('[data-action="speak"]').click();
+    assert.equal(f.shadow().querySelector(".speak.speaking"), null);
+    assert.equal(f.speech.current(), null);
+    assert.ok(f.zones.includes("-speech"));
+
+    f.shadow().querySelector('[data-action="speak"]').click();
+    assert.ok(f.shadow().querySelector(".speak.speaking"));
+    assert.equal(f.speech.spoken.length, 2, "再次点击应重播");
+
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.select("cn", "中文");
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".source")?.textContent === "中文");
+    assert.equal(f.speech.spoken.at(-1).text, "中文");
+    assert.equal(f.speech.spoken.at(-1).lang, "zh-CN");
+});
+
+test("turning off auto speak keeps manual replay and applies the rate setting", async t => {
+    const f = await page(t, {selectionSpeakEnabled: false, selectionSpeakRate: 0.8});
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.select("finance", "bank");
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".selection-card"));
+    assert.equal(f.speech.spoken.length, 0, "关闭后不应自动朗读");
+
+    f.shadow().querySelector('[data-action="speak"]').click();
+    await waitFor(() => f.shadow()?.querySelector(".speak.speaking"));
+    assert.equal(f.speech.spoken[0].rate, 0.8);
+});
+
+test("pinned card can read its own text and dismiss stops playback", async t => {
+    const f = await page(t);
+    f.select("finance", "bank");
+    await waitFor(() => f.shadow()?.querySelector(".selection-trigger"));
+    f.shadow().querySelector(".selection-trigger").click();
+    await waitFor(() => f.shadow()?.querySelector(".save"));
+    f.shadow().querySelector('[data-action="pin"]').click();
+    const pinned = f.document.querySelector("[data-ytbt-selection-pinned]")?.shadowRoot;
+    await waitFor(() => pinned?.querySelector('[data-action="speak"]'));
+    pinned.querySelector('[data-action="speak"]').click();
+    await waitFor(() => pinned.querySelector(".speak.speaking"));
+    assert.equal(f.speech.spoken.at(-1).text, "bank");
+    pinned.querySelector('[data-action="unpin"]').click();
+    assert.equal(f.speech.current(), null);
+});
+
+test("missing speech support disables the speaker but keeps translation working", async t => {
+    const f = await page(t);
+    f.window.speechSynthesis = undefined;
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerdown"));
+    f.select("finance", "bank");
+    f.document.dispatchEvent(pointerEvent(f.window, "pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".selection-card"));
+    assert.equal(f.shadow().querySelector('[data-action="speak"]').disabled, true);
+    await waitFor(() => f.shadow()?.querySelector(".translation")?.textContent === "银行");
 });

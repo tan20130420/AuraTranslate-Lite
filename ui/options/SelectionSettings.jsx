@@ -37,6 +37,19 @@ export function SelectionSettings({settings, update, hidden, navigate}) {
                        onChange={(event) => update({selectionAutoTranslate: event.target.checked})}/>
                 <span>松开左键即翻译<small>拖选单词、短语或句子后松开鼠标，立即翻译整段；关闭后需点击工具栏翻译按钮。</small></span>
             </label>
+            <label className="toggle">
+                <input id="selectionSpeakEnabled" type="checkbox"
+                       checked={settings.selectionSpeakEnabled !== false}
+                       onChange={(event) => update({selectionSpeakEnabled: event.target.checked})}/>
+                <span>选中即朗读<small>划词卡片出现时自动朗读选中的原文；点卡片上的喇叭可停止或重播。使用浏览器自带的语音。</small></span>
+            </label>
+            <label className="field">
+                <span>朗读语速</span>
+                <input id="selectionSpeakRate" type="range" min="0.7" max="1.2" step="0.1"
+                       value={Number(settings.selectionSpeakRate) > 0 ? Number(settings.selectionSpeakRate) : 1}
+                       onChange={(event) => update({selectionSpeakRate: Number(event.target.value)})}/>
+                <small>0.7 倍较慢，1.2 倍较快；默认 1.0。</small>
+            </label>
             <p className="section-note">
                 沿用扩展弹出窗口中的网页翻译服务和语言设置。使用 AI 服务时，会结合所选文字附近的上下文判断含义。
                 每次最多选择 3000 个字符。
@@ -116,6 +129,7 @@ export function SelectionSettings({settings, update, hidden, navigate}) {
             </div>
             <ol className="selection-guide">
                 <li>在网页上按住左键拖选单词、短语或句子，松开后立即翻译整段。</li>
+                <li>卡片出现时会自动朗读选中的原文，点喇叭可停止或重播。</li>
                 <li>译文卡片可“固定译文”，继续划选下一句，旧译文会保留在屏幕右上角。</li>
                 <li>点击“收藏到生词本”，把这一整段原文、译文、上下文和来源存为一条。</li>
             </ol>

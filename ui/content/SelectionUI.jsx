@@ -61,14 +61,26 @@ function SelectionToolbar({toolbar, copied, toolbarError, onAction}) {
     );
 }
 
-function SelectionCard({selection, result, translating, saving, saved, error, onAction, pinned, copiedText}) {
+function SelectionCard({selection, result, translating, saving, saved, error, onAction, pinned, copiedText,
+                       speaking, speakAvailable}) {
     return (
         <section className="surface selection-card" role="dialog" aria-label="划词翻译">
             <header>
                 <button type="button" className="close" aria-label="关闭划词翻译"
                         onClick={() => onAction("dismiss")}>×</button>
             </header>
-            <p className="source">{selection ? selection.sourceText : ""}</p>
+            <div className="source-row">
+                <p className="source">{selection ? selection.sourceText : ""}</p>
+                <button type="button" className={`speak${speaking ? " speaking" : ""}`}
+                        data-action="speak" aria-label={speaking ? "停止朗读" : "朗读选中文字"}
+                        title={speakAvailable ? (speaking ? "停止朗读" : "朗读选中文字") : "当前浏览器不支持朗读或未安装语音包"}
+                        disabled={!speakAvailable} onClick={() => onAction("speak")}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
+                         strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d={speaking ? "M7 7h10v10H7z" : "M11 5 6 9H3v6h3l5 4V5Zm5.5 3.5a5 5 0 0 1 0 7M18.5 6a8 8 0 0 1 0 12"}/>
+                    </svg>
+                </button>
+            </div>
             <p className={`translation${error ? " error" : ""}`} role="status" aria-live="polite">
                 {translating ? "正在翻译…" : (error || (result ? result.translatedText : ""))}
             </p>

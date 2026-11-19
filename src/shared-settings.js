@@ -65,6 +65,9 @@
         selectionTranslationEnabled: true,
         // 松开左键即翻译整段选区；关闭后退回手动点击工具栏翻译按钮。
         selectionAutoTranslate: true,
+        // 划词卡片出现时自动朗读所选原文；朗读用浏览器内置语音，不发送文本到扩展服务器。
+        selectionSpeakEnabled: true,
+        selectionSpeakRate: 1,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

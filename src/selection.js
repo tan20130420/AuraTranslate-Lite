@@ -5,7 +5,8 @@
     "use strict";
     const Core = globalThis.YTBTCore;
     if (!Core || !globalThis.chrome?.runtime || globalThis.YTBTSelection) return;
-    const state = {ready: false, enabled: true, autoTranslate: true, selecting: false, revision: 0,
+    const state = {ready: false, enabled: true, autoTranslate: true, speakEnabled: true, speakRate: 1,
+        selecting: false, revision: 0, speaking: false,
         selection: null, host: null, shadow: null, container: null, view: null, result: null,
         translating: false, saving: false, saved: false, error: "",
         toolbar: Core.normalizeSelectionToolbar(), copied: false, toolbarError: "", pinned: []};
@@ -21,6 +22,88 @@
     const hover = () => globalThis.YTBTHover;
     const suspendVideo = () => hover()?.suspend("selection");
     const releaseVideo = () => hover()?.release("selection");
+
+    // 朗读完全用浏览器内置的 Web Speech API：不上传文本、不需要额外权限。
+    // 语音因系统而异，优先用本地语音包，没有再退回任意可用语音；不可用时静默降级。
+    const speechEngine = () => window.speechSynthesis;
+    function speechAvailable() {
+        try {
+            return Boolean(speechEngine() && typeof speechEngine().speak === "function" &&
+                typeof window.SpeechSynthesisUtterance === "function");
+        } catch (_) { return false; }
+    }
+    function speechLang(text) {
+        return /[\u3400-\u9fff]/.test(text) ? "zh-CN" : "en-US";
+    }
+    function speechRate() {
+        const value = Number(state.speakRate);
+        return Number.isFinite(value) && value > 0 ? Math.min(1.2, Math.max(0.7, value)) : 1;
+    }
+    function pickSpeechVoice(lang) {
+        let voices = [];
+        try { voices = speechEngine()?.getVoices?.() || []; } catch (_) { return null; }
+        const normalized = (voice) => String(voice?.lang || "").toLowerCase().replace(/_/g, "-");
+        const matches = voices.filter((voice) => normalized(voice).startsWith(lang.slice(0, 2)));
+        return matches.find((voice) => voice.localService) || matches[0] || null;
+    }
+
+    // currentSpeech.target 指向 state（当前卡片）或某个固定卡片条目。
+    let currentSpeech = null;
+    function stopSpeech(quiet) {
+        const record = currentSpeech;
+        if (!record) return;
+        currentSpeech = null;
+        try { speechEngine()?.cancel?.(); } catch (_) { /* 浏览器不支持时忽略 */ }
+        hover()?.release("speech");
+        const target = record.target;
+        if (target === state) {
+            state.speaking = false;
+            if (!quiet) render();
+        } else {
+            target.speaking = false;
+            if (!quiet) renderPinned(target);
+        }
+    }
+    // force=true 用于手动点喇叭：即使关掉自动朗读，也允许用户主动听一遍。
+    function speakTarget(target, text, toggle, force) {
+        if (!target || !text || (!state.speakEnabled && !force) || !speechAvailable()) return false;
+        if (toggle && currentSpeech && currentSpeech.target === target) { stopSpeech(); return true; }
+        stopSpeech();
+        const utterance = new window.SpeechSynthesisUtterance(text);
+        const lang = speechLang(text);
+        const voice = pickSpeechVoice(lang);
+        utterance.lang = voice?.lang || lang;
+        if (voice) utterance.voice = voice;
+        utterance.rate = speechRate();
+        const record = {target, utterance};
+        currentSpeech = record;
+        const finish = () => {
+            if (currentSpeech !== record) return;
+            currentSpeech = null;
+            hover()?.release("speech");
+            if (target === state) {
+                state.speaking = false;
+                render();
+            } else {
+                target.speaking = false;
+                renderPinned(target);
+            }
+        };
+        utterance.onend = finish;
+        utterance.onerror = finish;
+        hover()?.suspend("speech");
+        if (target === state) state.speaking = true;
+        else target.speaking = true;
+        try {
+            speechEngine().speak(utterance);
+        } catch (_) {
+            finish();
+            return false;
+        }
+        if (target === state) render();
+        else renderPinned(target);
+        return true;
+    }
 
     async function copyInto(shadow, text) {
         if (!text) return false;
@@ -48,6 +131,7 @@
 
     function dismiss() {
         clearTimeout(timer);
+        stopSpeech(true);
         state.revision++;
         const hadHost = Boolean(state.host);
         state.host?.remove();
@@ -101,10 +185,12 @@
         return true;
     }
 
-    function schedule(anchor) {
+    function schedule(anchor, speak) {
         clearTimeout(timer);
         if (state.selecting) return;
-        timer = setTimeout(() => capture(anchor), 160);
+        timer = setTimeout(() => {
+            if (capture(anchor) && speak) speakTarget(state, state.selection?.sourceText);
+        }, 160);
     }
 
     function mount() {
@@ -137,6 +223,8 @@
             copied: state.copied,
             copiedText: "",
             pinned: false,
+            speaking: state.speaking,
+            speakAvailable: speechAvailable(),
             toolbarError: state.toolbarError,
             onAction: handleSelectionAction
         };
@@ -148,6 +236,7 @@
         else if (action === "vocabulary" || action === "book") openBook();
         else if (action === "save") saveWord();
         else if (action === "pin") pinCurrent();
+        else if (action === "speak") speakTarget(state, state.selection?.sourceText, true, true);
         else if (action === "dismiss") dismiss();
     }
 
@@ -164,6 +253,8 @@
             copied: false,
             copiedText: entry.copiedText,
             pinned: true,
+            speaking: Boolean(entry.speaking),
+            speakAvailable: speechAvailable(),
             toolbarError: "",
             onAction: (action) => handlePinnedAction(entry, action)
         };
@@ -192,6 +283,7 @@
     function unpin(entry) {
         const index = state.pinned.indexOf(entry);
         if (index < 0) return;
+        if (currentSpeech?.target === entry) stopSpeech(true);
         state.pinned.splice(index, 1);
         entry.host?.remove();
         entry.view?.unmount();
@@ -215,6 +307,7 @@
         else if (action === "save") savePinnedWord(entry);
         else if (action === "copy-source") copyPinned(entry, "source");
         else if (action === "copy-translation") copyPinned(entry, "translation");
+        else if (action === "speak") speakTarget(entry, entry.selection?.sourceText, true, true);
     }
 
     async function savePinnedWord(entry) {
@@ -379,10 +472,11 @@
             // 松开左键即把这次选区作为一整段翻译，不拆词。
             clearTimeout(timer);
             const previous = state.selection?.originalText;
-            capture(anchor);
+            const changed = capture(anchor);
+            if (changed) speakTarget(state, state.selection?.sourceText);
             if (state.selection && state.selection.originalText !== previous) translate();
         } else {
-            schedule(anchor);
+            schedule(anchor, true);
         }
     }
 
@@ -398,9 +492,11 @@
                 clearTimeout(timer);
                 timer = setTimeout(() => {
                     const previous = state.selection?.originalText;
-                    if (capture(null) && state.selection && state.selection.originalText !== previous) translate();
+                    const changed = capture(null);
+                    if (changed) speakTarget(state, state.selection?.sourceText);
+                    if (state.selection && state.selection.originalText !== previous) translate();
                 }, 200);
-            } else schedule();
+            } else schedule(null, true);
         }
     }, true);
     document.addEventListener("pointerdown", (event) => {
@@ -422,16 +518,24 @@
         if (area !== "local") return;
         if (changes.selectionTranslationEnabled) state.enabled = changes.selectionTranslationEnabled.newValue !== false;
         if (changes.selectionAutoTranslate) state.autoTranslate = changes.selectionAutoTranslate.newValue !== false;
+        if (changes.selectionSpeakEnabled) {
+            state.speakEnabled = changes.selectionSpeakEnabled.newValue !== false;
+            if (!state.speakEnabled) stopSpeech();
+        }
+        if (changes.selectionSpeakRate) state.speakRate = changes.selectionSpeakRate.newValue;
         if (changes.selectionToolbar) state.toolbar = Core.normalizeSelectionToolbar(changes.selectionToolbar.newValue);
         if (!state.enabled) dismiss();
         else if (changes.selectionToolbar) render();
     });
     chrome.storage.local.get({selectionTranslationEnabled: true, selectionAutoTranslate: true,
+        selectionSpeakEnabled: true, selectionSpeakRate: 1,
         selectionToolbar: Core.DEFAULT_SETTINGS.selectionToolbar}, (settings) => {
         const error = chrome.runtime.lastError;
         if (error) return;
         state.enabled = settings.selectionTranslationEnabled !== false;
         state.autoTranslate = settings.selectionAutoTranslate !== false;
+        state.speakEnabled = settings.selectionSpeakEnabled !== false;
+        state.speakRate = settings.selectionSpeakRate;
         state.toolbar = Core.normalizeSelectionToolbar(settings.selectionToolbar);
         state.ready = true;
         capture();
