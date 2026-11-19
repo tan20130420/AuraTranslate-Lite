@@ -3,8 +3,9 @@
  *
  * 三个悬停行为：
  *   1. 鼠标停在字幕上 → 暂停播放（移开后恢复，仅恢复自己暂停的那次）
- *   2. 鼠标停在右侧推荐视频列表上 → 暂停播放
- *   3. 鼠标停在字幕里的英文单词上 → 显示音标与中文释义，可一键收藏
+ *   2. 鼠标停在悬浮字幕列表某一行上 → 暂停播放（移开后恢复）
+ *   3. 鼠标停在右侧推荐视频列表上 → 暂停播放
+ *   4. 鼠标停在字幕/字幕列表里的英文单词上 → 显示音标与中文释义，可一键收藏
  *
  * 加载顺序见 content-main.js 顶部注释；本文件依赖 content-core 的 state、
  * content-player 的 getCurrentTimeMs，因此排在 content-overlay 之后。
@@ -17,12 +18,14 @@ var HOVER_RESUME_DELAY_MS = 180;
 // 从字幕移向浮层的途中会短暂路过空白，给一段宽限再收浮层
 var HOVER_TIP_GRACE_MS = 280;
 var HOVER_LINE_SELECTOR = ".ytbt-lines";
-var HOVER_WORD_SELECTOR = ".ytbt-en";
+var HOVER_TRANSCRIPT_SELECTOR = ".ytbt-cue-row";
+// 字幕列表里的原文也能用同样的单词浮层取词；译文多为中文，不参与英文查词。
+var HOVER_WORD_SELECTOR = ".ytbt-en, .ytbt-cue-source";
 // 右侧推荐列表：桌面版是 #secondary，Shorts 与部分新版布局用自定义元素。
 var HOVER_RELATED_SELECTOR = "#secondary, ytd-watch-next-secondary-results-renderer, #related";
 
 var hoverZones = new Set();
-var hoverZoneFlags = {subtitle: false, related: false, tooltip: false};
+var hoverZoneFlags = {subtitle: false, transcript: false, related: false, tooltip: false};
 var hoverPauseOwned = false;
 var hoverResumeTimer = 0;
 var hoverWordTimer = 0;
@@ -410,6 +413,7 @@ function hoverTrackWord(event) {
 function hoverZoneOf(target) {
     if (!target || !target.closest) return "";
     if (target.closest(".ytbt-wordtip")) return "tooltip";
+    if (target.closest(HOVER_TRANSCRIPT_SELECTOR)) return "transcript";
     if (target.closest(HOVER_LINE_SELECTOR)) return "subtitle";
     if (target.closest(HOVER_RELATED_SELECTOR)) return "related";
     return "";
@@ -420,6 +424,7 @@ function hoverZoneOf(target) {
 function hoverApplyZone(zone, event) {
     const next = {
         subtitle: zone === "subtitle",
+        transcript: zone === "transcript",
         related: zone === "related",
         tooltip: zone === "tooltip",
     };
@@ -430,7 +435,7 @@ function hoverApplyZone(zone, event) {
         else hoverRelease(name);
     }
 
-    if (zone === "subtitle") {
+    if (zone === "subtitle" || zone === "transcript") {
         hoverCancelHideTip();
         hoverTrackWord(event);
         return;
@@ -471,7 +476,7 @@ var hoverMoveTimer = 0;
 var hoverLastMoveEvent = null;
 
 function hoverHandleMove(event) {
-    if (!hoverZoneFlags.subtitle || !hoverLookupAllowed()) return;
+    if (!(hoverZoneFlags.subtitle || hoverZoneFlags.transcript) || !hoverLookupAllowed()) return;
     const now = Date.now();
     const elapsed = now - hoverLastMoveAt;
     if (elapsed >= HOVER_MOVE_MIN_MS) {
@@ -488,7 +493,7 @@ function hoverHandleMove(event) {
     hoverMoveTimer = setTimeout(() => {
         hoverMoveTimer = 0;
         hoverLastMoveAt = Date.now();
-        if (!hoverZoneFlags.subtitle || !hoverLastMoveEvent) return;
+        if (!(hoverZoneFlags.subtitle || hoverZoneFlags.transcript) || !hoverLastMoveEvent) return;
         hoverTrackWord(hoverLastMoveEvent);
     }, HOVER_MOVE_MIN_MS - elapsed);
 }

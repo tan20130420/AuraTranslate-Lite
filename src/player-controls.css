@@ -68,7 +68,7 @@
 .ytbt-player-ui .ytbt-cue-row[aria-current="true"] { background: #ece7f8; box-shadow: inset 3px 0 var(--ytbt-tools-accent); }
 .ytbt-cue-row time { flex: 0 0 48px; color: #72638e; font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 1px; }
 .ytbt-cue-row > span { flex: 1; min-width: 0; }
-.ytbt-cue-source, .ytbt-cue-translation { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.ytbt-cue-source, .ytbt-cue-translation { display: block; font-size: 13px; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; cursor: text; }
 .ytbt-cue-translation { color: #65616c; margin-top: 3px; }
 .ytbt-cue-translation:empty { display: none; }
 .ytbt-list-empty { padding: 12px; margin: 0; color: #686570; overflow-wrap: anywhere; }

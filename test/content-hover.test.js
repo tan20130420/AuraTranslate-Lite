@@ -30,7 +30,9 @@ function line(text, className = "ytbt-en") {
         className,
         parentElement: null,
         closest(selector) {
-            if (selector === ".ytbt-en") return className === "ytbt-en" ? element : null;
+            if (selector === ".ytbt-en, .ytbt-cue-source") {
+                return (className === "ytbt-en" || className === "ytbt-cue-source") ? element : null;
+            }
             if (selector === ".ytbt-lines") return element;
             return null;
         },
@@ -191,6 +193,26 @@ test("关闭悬停暂停开关后不再暂停", () => {
     assert.equal(video.paused, false);
 });
 
+test("悬浮字幕列表行会暂停播放，移开后恢复", async () => {
+    const video = fakeVideo();
+    const {api} = load({video});
+    const row = {
+        closest(selector) {
+            return selector === ".ytbt-cue-row" ? row : null;
+        },
+    };
+
+    assert.equal(api.hoverZoneOf(row), "transcript");
+    api.hoverApplyZone("transcript", {clientX: 20, clientY: 40});
+    assert.equal(video.paused, true, "停在字幕行上应当暂停");
+    assert.equal(video.pauseCalls, 1);
+
+    api.hoverApplyZone("", null);
+    await wait(260);
+    assert.equal(video.paused, false, "移开后应当恢复");
+    assert.equal(video.playCalls, 1);
+});
+
 test("在字幕里取到光标下的英文单词", () => {
     const text = "She stayed resilient after the setback.";
     const {node} = line(text);
@@ -201,6 +223,17 @@ test("在字幕里取到光标下的英文单词", () => {
     assert.ok(hit, "应该取到单词");
     assert.equal(hit.word, "resilient");
     assert.equal(hit.range.startOffset, text.indexOf("resilient"));
+});
+
+test("悬浮字幕列表的原文也能取词", () => {
+    const text = "She stayed resilient after the setback.";
+    const {node} = line(text, "ytbt-cue-source");
+    const offset = text.indexOf("resilient") + 3;
+    const {api} = load({video: fakeVideo(), caretTarget: {node, offset}});
+
+    const hit = api.hoverWordAtPoint(400, 510);
+    assert.ok(hit, "字幕列表原文应当能取词");
+    assert.equal(hit.word, "resilient");
 });
 
 test("光标停在词尾空白时取左边的词", () => {

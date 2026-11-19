@@ -154,6 +154,14 @@ function updatePlayerFollow(checked) {
 }
 
 function seekPlayerCue(cue) {
+    // 在字幕行里划线取词时，mouseup 之后仍会触发行的 click。
+    // 此时跳过跳转，避免选区和取词工具栏被立即清掉。
+    const selection = window.getSelection && window.getSelection();
+    if (selection && !selection.isCollapsed) {
+        const node = selection.anchorNode || selection.focusNode;
+        const element = node && (node.nodeType === 1 ? node : node.parentElement);
+        if (element && element.closest && element.closest(".ytbt-cue-row")) return;
+    }
     const video = state.video || document.querySelector("video");
     if (!video) return;
     video.currentTime = cue.startMs / 1000;

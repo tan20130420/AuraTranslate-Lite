@@ -244,6 +244,26 @@ test("transcript searches both languages, seeks, highlights, and does not call A
     assert.deepEqual(f.calls, []);
 });
 
+test("selecting transcript text keeps the selection instead of seeking", async (t) => {
+    const f = fixture(t);
+    await f.win.handlePlayerControlAction("transcript");
+    f.win.renderPlayerTranscript();
+    const row = f.$(".ytbt-cue-row");
+    const range = f.win.document.createRange();
+    range.selectNodeContents(row.querySelector(".ytbt-cue-source"));
+    const selection = f.win.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    assert.equal(selection.isCollapsed, false);
+
+    row.click();
+    assert.equal(f.win.state.video.currentTime, 0, "划线取词时不应跳转视频");
+
+    selection.removeAllRanges();
+    f.win.document.querySelectorAll(".ytbt-cue-row")[1].click();
+    assert.equal(f.win.state.video.currentTime, 10, "无选区时点击应正常跳转");
+});
+
 test("cached paragraphs split only into complete sentences shared by the list and overlay", async (t) => {
     const f = fixture(t);
     const cue = {...require("./fixtures/sentence-caption.json")};
