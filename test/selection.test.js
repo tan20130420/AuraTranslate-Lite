@@ -88,6 +88,44 @@ test("releasing the left button translates the whole selected phrase automatical
     assert.ok(zones.includes("+selection"), "译文卡片打开期间应登记暂停区域");
 });
 
+test("dragging inside the player panel translates even though the panel stops pointerup propagation", async t => {
+    const f = await page(t);
+    f.window.YTBTHover = {suspend() {}, release() {}, hideTip() {}};
+
+    // 模拟内容脚本插入的悬浮字幕面板：它在根节点上拦截 pointerup 冒泡。
+    const panel = f.document.createElement("div");
+    panel.className = "ytbt-player-ui";
+    panel.addEventListener("pointerup", event => event.stopPropagation());
+    const cue = f.document.createElement("span");
+    cue.className = "ytbt-cue-source";
+    cue.textContent = "We sat on the river bank.";
+    panel.appendChild(cue);
+    f.document.body.appendChild(panel);
+
+    const pointer = (type) => {
+        const event = new f.window.Event(type, {bubbles: true, composed: true});
+        for (const [key, value] of Object.entries({button: 0, clientX: 150, clientY: 120})) {
+            Object.defineProperty(event, key, {value, configurable: true});
+        }
+        return event;
+    };
+
+    cue.dispatchEvent(pointer("pointerdown"));
+    const node = cue.firstChild;
+    const range = f.document.createRange();
+    range.setStart(node, 20);
+    range.setEnd(node, 24);
+    const selection = f.window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    f.document.dispatchEvent(new f.window.Event("selectionchange"));
+    assert.equal(f.requests.length, 0, "拖拽过程中不应提前翻译");
+
+    cue.dispatchEvent(pointer("pointerup"));
+    await waitFor(() => f.shadow()?.querySelector(".translation")?.textContent === "河岸");
+    assert.equal(f.requests.length, 1);
+});
+
 test("turning off auto translate restores the click-to-translate toolbar", async t => {
     const f = await page(t, {selectionAutoTranslate: false});
     f.select("finance", "bank");

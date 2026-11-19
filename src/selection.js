@@ -387,7 +387,10 @@
     }
 
     document.addEventListener("selectionchange", schedule);
-    document.addEventListener("pointerup", handlePointerUp);
+    // 悬浮字幕面板在自己的根节点上 stopPropagation()，冒泡阶段的 pointerup 到不了 document，
+    // 会导致在字幕列表里拖选后 state.selecting 一直为 true、永远不触发即译。
+    // 捕获阶段先于目标节点执行，不受面板拦截影响。
+    document.addEventListener("pointerup", handlePointerUp, true);
     document.addEventListener("keyup", (event) => {
         if (event.key === "Escape") dismiss();
         else if (event.key.startsWith("Arrow") || event.key === "Shift") {
@@ -399,7 +402,7 @@
                 }, 200);
             } else schedule();
         }
-    });
+    }, true);
     document.addEventListener("pointerdown", (event) => {
         if (event.button === 0 && !inOwnUI(event)) state.selecting = true;
         if (state.host && !event.composedPath().includes(state.host)) dismiss();
