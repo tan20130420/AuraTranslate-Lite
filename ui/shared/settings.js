@@ -88,6 +88,7 @@ export function settingsPatch(settings) {
         "selectionAutoTranslate",
         "selectionSpeakEnabled",
         "selectionSpeakRate",
+        "hoverSpeakEnabled",
         "llmSentenceSegmentationEnabled",
         "asrCorrectionEnabled",
         "showOriginalTechnicalTerms",

@@ -43,12 +43,18 @@ export function SelectionSettings({settings, update, hidden, navigate}) {
                        onChange={(event) => update({selectionSpeakEnabled: event.target.checked})}/>
                 <span>选中即朗读<small>划词卡片出现时自动朗读选中的原文；点卡片上的喇叭可停止或重播。使用浏览器自带的语音。</small></span>
             </label>
+            <label className="toggle">
+                <input id="hoverSpeakEnabled" type="checkbox"
+                       checked={settings.hoverSpeakEnabled !== false}
+                       onChange={(event) => update({hoverSpeakEnabled: event.target.checked})}/>
+                <span>悬停单词即朗读<small>鼠标停在字幕中的英文单词、释义词卡弹出时，自动朗读该单词；点词卡上的喇叭可停止或重播。语速与划词朗读共用下方设置。</small></span>
+            </label>
             <label className="field">
                 <span>朗读语速</span>
                 <input id="selectionSpeakRate" type="range" min="0.7" max="1.2" step="0.1"
                        value={Number(settings.selectionSpeakRate) > 0 ? Number(settings.selectionSpeakRate) : 1}
                        onChange={(event) => update({selectionSpeakRate: Number(event.target.value)})}/>
-                <small>0.7 倍较慢，1.2 倍较快；默认 1.0。</small>
+                <small>0.7 倍较慢，1.2 倍较快；默认 1.0。同时作用于划词朗读和悬停单词朗读。</small>
             </label>
             <p className="section-note">
                 沿用扩展弹出窗口中的网页翻译服务和语言设置。使用 AI 服务时，会结合所选文字附近的上下文判断含义。

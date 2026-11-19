@@ -59,6 +59,94 @@ function hoverLookupAllowed() {
     return settings.hoverLookupEnabled !== false;
 }
 
+// --- 悬停单词朗读（浏览器内置 Web Speech API，不上传文本） ---
+
+function hoverSpeakAllowed() {
+    const settings = state.settings || {};
+    return settings.hoverSpeakEnabled !== false;
+}
+
+function hoverSpeechEngine() {
+    try { return window.speechSynthesis; } catch (_) { return null; }
+}
+
+function hoverSpeechAvailable() {
+    try {
+        const engine = hoverSpeechEngine();
+        return Boolean(engine && typeof engine.speak === "function" &&
+            typeof window.SpeechSynthesisUtterance === "function");
+    } catch (_) { return false; }
+}
+
+function hoverSpeechRate() {
+    const value = Number((state.settings || {}).selectionSpeakRate);
+    return Number.isFinite(value) && value > 0 ? Math.min(1.2, Math.max(0.7, value)) : 1;
+}
+
+function hoverPickVoice() {
+    let voices = [];
+    try { voices = hoverSpeechEngine()?.getVoices?.() || []; } catch (_) { return null; }
+    const normalized = (voice) => String(voice?.lang || "").toLowerCase().replace(/_/g, "-");
+    const matches = voices.filter((voice) => normalized(voice).startsWith("en"));
+    return matches.find((voice) => voice.localService) || matches[0] || null;
+}
+
+// 当前朗读的单词；同一个单词不重复朗读，只有换词才重新读。
+var hoverSpeakingWord = "";
+var hoverSpeechActive = false;
+
+function hoverStopSpeech() {
+    if (!hoverSpeechActive && !hoverSpeakingWord) return;
+    hoverSpeechActive = false;
+    hoverSpeakingWord = "";
+    try { hoverSpeechEngine()?.cancel?.(); } catch (_) { /* 不支持时忽略 */ }
+    const button = hoverTip && hoverTip.querySelector(".ytbt-wordtip-speak");
+    if (button) {
+        button.classList.remove("speaking");
+        button.setAttribute("aria-label", "朗读单词");
+    }
+    hoverRelease("hoverSpeech");
+}
+
+function hoverSpeakWord(word) {
+    if (!word || !hoverSpeakAllowed() || !hoverSpeechAvailable()) return false;
+    if (hoverSpeakingWord === word && hoverSpeechActive) return false;
+    hoverStopSpeech();
+    const utterance = new window.SpeechSynthesisUtterance(word);
+    const voice = hoverPickVoice();
+    utterance.lang = voice?.lang || "en-US";
+    if (voice) utterance.voice = voice;
+    utterance.rate = hoverSpeechRate();
+    hoverSpeakingWord = word;
+    hoverSpeechActive = true;
+    const finish = () => {
+        if (!hoverSpeechActive) return;
+        hoverSpeechActive = false;
+        hoverSpeakingWord = "";
+        const button = hoverTip && hoverTip.querySelector(".ytbt-wordtip-speak");
+        if (button) {
+            button.classList.remove("speaking");
+            button.setAttribute("aria-label", "朗读单词");
+        }
+        hoverRelease("hoverSpeech");
+    };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    hoverSuspend("hoverSpeech");
+    const button = hoverTip && hoverTip.querySelector(".ytbt-wordtip-speak");
+    if (button) {
+        button.classList.add("speaking");
+        button.setAttribute("aria-label", "停止朗读");
+    }
+    try {
+        hoverSpeechEngine().speak(utterance);
+    } catch (_) {
+        finish();
+        return false;
+    }
+    return true;
+}
+
 // --- 暂停 / 恢复 ---
 
 function hoverSuspend(reason) {
@@ -250,6 +338,21 @@ function hoverRenderTip(result, range) {
         phonetic.textContent = result.phonetic;
         head.appendChild(phonetic);
     }
+    if (hoverSpeechAvailable()) {
+        const speak = document.createElement("button");
+        speak.type = "button";
+        speak.className = "ytbt-wordtip-speak";
+        speak.setAttribute("aria-label", "朗读单词");
+        speak.textContent = "🔊";
+        speak.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (hoverSpeechActive && hoverSpeakingWord === result.word) hoverStopSpeech();
+            else hoverSpeakWord(result.word);
+        });
+        head.appendChild(speak);
+        if (speak.classList) speak.classList.remove("speaking");
+    }
     tip.appendChild(head);
 
     for (const entry of result.entries || []) {
@@ -287,7 +390,11 @@ function hoverRenderTip(result, range) {
     // 浮层一显示就接管暂停：从单词移向浮层的途中会有空隙，
     // 若只靠 pointer 进入浮层才暂停，这段空隙会把播放提前恢复。
     hoverSuspend("tooltip");
+    const wordChanged = hoverTipWord !== result.word;
     hoverTipWord = result.word;
+    // 换词时先停掉上一个单词的朗读，再自动朗读新词；同一个词不重复读
+    if (wordChanged) hoverStopSpeech();
+    hoverSpeakWord(result.word);
     // 定位依赖布局信息，个别时机（刚插入 DOM）拿不到尺寸时不能让浮层消失
     try {
         hoverPositionTip(tip, range);
@@ -313,6 +420,7 @@ function hoverCancelHideTip() {
 function hoverHideTip() {
     if (hoverTipHideTimer) clearTimeout(hoverTipHideTimer);
     hoverTipHideTimer = 0;
+    hoverStopSpeech();
     hoverTipWord = "";
     hoverHighlight(null);
     const wasVisible = Boolean(hoverTip && !hoverTip.hidden);
@@ -538,6 +646,16 @@ function bindHoverInteractions() {
         window.addEventListener("scroll", hoverHideTip, true);
         window.addEventListener("resize", hoverHideTip);
     }
+    // 关闭悬停朗读开关时立刻停下正在播放的朗读。
+    try {
+        if (globalThis.chrome?.storage?.onChanged) {
+            globalThis.chrome.storage.onChanged.addListener((changes) => {
+                if (changes.hoverSpeakEnabled && changes.hoverSpeakEnabled.newValue === false) {
+                    hoverStopSpeech();
+                }
+            });
+        }
+    } catch (_) { /* 无 storage 权限时忽略 */ }
     hoverBindPlayWatcher();
 }
 

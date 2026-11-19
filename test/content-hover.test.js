@@ -41,7 +41,38 @@ function line(text, className = "ytbt-en") {
     return {node, element};
 }
 
-function load({video, settings = {}, caretTarget = null, lookup = null, selectionBusy = false} = {}) {
+function installSpeechStub(window) {
+    const spoken = [];
+    let current = null;
+    window.SpeechSynthesisUtterance = class {
+        constructor(text) {
+            this.text = text;
+            this.lang = "";
+            this.rate = 1;
+            this.voice = null;
+        }
+    };
+    window.speechSynthesis = {
+        getVoices: () => [
+            {name: "Online EN", lang: "en-US", localService: false},
+            {name: "Local EN", lang: "en-GB", localService: true},
+        ],
+        cancel() { current = null; },
+        speak(utterance) {
+            spoken.push({text: utterance.text, lang: utterance.lang, rate: utterance.rate,
+                voice: utterance.voice?.name || ""});
+            current = utterance;
+        },
+    };
+    return {spoken, current: () => current, finish() {
+        const utterance = current;
+        current = null;
+        utterance?.onend?.();
+    }};
+}
+
+function load({video, settings = {}, caretTarget = null, lookup = null, selectionBusy = false,
+               withSpeech = false, onStorageChanged = null} = {}) {
     const listeners = {document: [], window: []};
     const created = [];
     const highlights = new Map();
@@ -73,17 +104,34 @@ function load({video, settings = {}, caretTarget = null, lookup = null, selectio
                 textContent: "",
                 isConnected: true,
                 handlers: {},
+                attrs: {},
+                _classes: new Set(),
+                get classList() {
+                    const classes = this._classes;
+                    return {
+                        add(name) { classes.add(name); },
+                        remove(name) { classes.delete(name); },
+                        contains(name) { return classes.has(name); },
+                    };
+                },
                 appendChild(child) {
                     this.children.push(child);
                     this.textContent += child.textContent || "";
                     if (child.className === "ytbt-wordtip-save") this._save = child;
+                    if (child.className === "ytbt-wordtip-speak") this._speak = child;
                     return child;
                 },
                 querySelector(selector) {
-                    return selector === ".ytbt-wordtip-save" ? this._save || null : null;
+                    const cls = String(selector).replace(/^\./, "");
+                    if (this.className === cls) return this;
+                    for (const child of this.children) {
+                        const found = child.querySelector?.(selector);
+                        if (found) return found;
+                    }
+                    return null;
                 },
                 addEventListener(type, handler) { (this.handlers[type] = this.handlers[type] || []).push(handler); },
-                setAttribute() {},
+                setAttribute(name, value) { this.attrs[name] = value; },
                 // 真实 DOM 一定有这两个方法：定位浮层时会用到
                 getBoundingClientRect() { return {top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0}; },
                 isConnected: true,
@@ -100,7 +148,7 @@ function load({video, settings = {}, caretTarget = null, lookup = null, selectio
         getSelection() { return {isCollapsed: !selectionBusy}; },
         addEventListener(type, handler) { listeners.window.push([type, handler]); },
     };
-
+    const speech = withSpeech ? installSpeechStub(window) : null;
     const sent = [];
     const context = vm.createContext({
         console,
@@ -122,8 +170,17 @@ function load({video, settings = {}, caretTarget = null, lookup = null, selectio
             runtime: {
                 async sendMessage(message) {
                     sent.push(message);
-                    if (message.type === "LOOKUP_WORD") return lookup || {ok: false};
+                    if (message.type === "LOOKUP_WORD") {
+                        return typeof lookup === "function" ? lookup(message.word) : (lookup || {ok: false});
+                    }
                     return {ok: true};
+                },
+            },
+            storage: {
+                onChanged: {
+                    addListener(handler) {
+                        if (onStorageChanged) onStorageChanged.handlers.push(handler);
+                    },
                 },
             },
         },
@@ -138,7 +195,7 @@ function load({video, settings = {}, caretTarget = null, lookup = null, selectio
     context.globalThis = context;
     vm.runInContext(source, context);
 
-    return {api: context, document, listeners, created, highlights, sent, video};
+    return {api: context, document, listeners, created, highlights, sent, video, speech};
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -461,4 +518,134 @@ test("换到同一行的另一个词时，旧浮层要留到新释义返回，�
 
     assert.equal(tip.hidden, false, "换词途中不能把浮层关掉，否则收藏按钮点不到");
     assert.match(tip.textContent, /compound/, "新释义回来之前保留旧内容");
+});
+
+function speechLookup(word) {
+    return {ok: true, result: {word, phonetic: "/test/", entries: [{pos: "adj.", variants: ["测试释义"]}]}};
+}
+
+test("悬停词卡弹出时自动朗读英文单词，用本地语音并沿用语速", async () => {
+    const text = "She stayed resilient after the setback.";
+    const {node} = line(text);
+    const video = fakeVideo();
+    const f = load({
+        video,
+        settings: {selectionSpeakRate: 0.8},
+        caretTarget: {node, offset: text.indexOf("resilient") + 2},
+        lookup: speechLookup("resilient"),
+        withSpeech: true,
+    });
+
+    f.api.hoverTrackWord({clientX: 400, clientY: 510});
+    await wait(400);
+
+    assert.equal(f.speech.spoken.length, 1);
+    assert.equal(f.speech.spoken[0].text, "resilient", "只读单词本身，不读释义");
+    assert.equal(f.speech.spoken[0].voice, "Local EN", "优先本地语音");
+    assert.equal(f.speech.spoken[0].rate, 0.8, "沿用划词朗读的语速设置");
+    assert.equal(video.paused, true, "朗读期间视频保持暂停");
+    const tip = f.created[0];
+    const speak = tip.querySelector(".ytbt-wordtip-speak");
+    assert.ok(speak, "词卡应有喇叭按钮");
+    assert.equal(speak.classList.contains("speaking"), true, "朗读中按钮为播放状态");
+});
+
+test("点喇叭停止朗读，再点重播同一个单词", async () => {
+    const text = "Tiny habits compound over time.";
+    const {node} = line(text);
+    const f = load({
+        video: fakeVideo(),
+        caretTarget: {node, offset: text.indexOf("compound") + 2},
+        lookup: speechLookup("compound"),
+        withSpeech: true,
+    });
+
+    f.api.hoverTrackWord({clientX: 400, clientY: 510});
+    await wait(400);
+    const speak = f.created[0].querySelector(".ytbt-wordtip-speak");
+    assert.ok(speak);
+    const click = () => speak.handlers.click[0]({preventDefault() {}, stopPropagation() {}});
+
+    click();
+    assert.equal(f.speech.current(), null, "点击后停止播放");
+    assert.equal(speak.classList.contains("speaking"), false);
+    click();
+    assert.equal(f.speech.spoken.length, 2, "再次点击重播");
+    assert.equal(f.speech.spoken[1].text, "compound");
+    assert.equal(speak.classList.contains("speaking"), true);
+});
+
+test("换词时停掉旧单词的朗读并朗读新单词，同一词不重复朗读", async () => {
+    const text = "Tiny habits compound over time.";
+    const {node} = line(text);
+    // caretTarget 可变：取词位置改变时命中不同单词
+    const caret = {node, offset: text.indexOf("Tiny") + 1};
+    const f = load({
+        video: fakeVideo(),
+        caretTarget: caret,
+        lookup: (word) => speechLookup(word),
+        withSpeech: true,
+    });
+
+    f.api.hoverTrackWord({clientX: 300, clientY: 510});
+    await wait(400);
+    assert.deepEqual(f.speech.spoken.map(s => s.text), ["Tiny"]);
+
+    // 同一单词重复渲染不应重复朗读
+    f.api.hoverTrackWord({clientX: 305, clientY: 510});
+    await wait(120);
+    assert.equal(f.speech.spoken.length, 1, "同一单词不重复朗读");
+
+    // 换到另一个词：停止旧的，朗读新的
+    caret.offset = text.indexOf("compound") + 2;
+    f.api.hoverTrackWord({clientX: 420, clientY: 510});
+    await wait(400);
+    assert.deepEqual(f.speech.spoken.map(s => s.text), ["Tiny", "compound"]);
+    assert.equal(f.speech.current().text, "compound");
+});
+
+test("关闭悬停朗读开关后不朗读，运行中关闭会立刻停止", async () => {
+    const text = "Tiny habits compound over time.";
+    const {node} = line(text);
+    const off = load({
+        video: fakeVideo(),
+        settings: {hoverSpeakEnabled: false},
+        caretTarget: {node, offset: text.indexOf("Tiny") + 1},
+        lookup: speechLookup("Tiny"),
+        withSpeech: true,
+    });
+    off.api.hoverTrackWord({clientX: 400, clientY: 510});
+    await wait(400);
+    assert.equal(off.speech.spoken.length, 0, "开关关闭时不朗读");
+
+    const onStorageChanged = {handlers: []};
+    const f = load({
+        video: fakeVideo(),
+        caretTarget: {node, offset: text.indexOf("Tiny") + 1},
+        lookup: speechLookup("Tiny"),
+        withSpeech: true,
+        onStorageChanged,
+    });
+    f.api.hoverTrackWord({clientX: 400, clientY: 510});
+    await wait(400);
+    assert.equal(f.speech.spoken.length, 1, "默认开启时自动朗读");
+    assert.ok(onStorageChanged.handlers.length > 0, "应监听设置变更");
+    onStorageChanged.handlers.forEach(handler => handler({hoverSpeakEnabled: {newValue: false}}));
+    assert.equal(f.speech.current(), null, "关闭设置后立刻停止朗读");
+});
+
+test("浏览器不支持语音时词卡无喇叭按钮但不影响释义", async () => {
+    const text = "Tiny habits compound over time.";
+    const {node} = line(text);
+    const f = load({
+        video: fakeVideo(),
+        caretTarget: {node, offset: text.indexOf("Tiny") + 1},
+        lookup: speechLookup("Tiny"),
+        withSpeech: false,
+    });
+    f.api.hoverTrackWord({clientX: 400, clientY: 510});
+    await wait(400);
+    const tip = f.created[0];
+    assert.equal(tip.querySelector(".ytbt-wordtip-speak"), null, "不支持语音时不显示喇叭");
+    assert.match(tip.textContent, /测试释义/, "释义仍正常显示");
 });

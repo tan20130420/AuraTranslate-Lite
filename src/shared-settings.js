@@ -68,6 +68,8 @@
         // 划词卡片出现时自动朗读所选原文；朗读用浏览器内置语音，不发送文本到扩展服务器。
         selectionSpeakEnabled: true,
         selectionSpeakRate: 1,
+        // 悬停单词词卡出现时自动朗读该英文单词；语速沿用 selectionSpeakRate。
+        hoverSpeakEnabled: true,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",
