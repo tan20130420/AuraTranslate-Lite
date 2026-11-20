@@ -10,6 +10,8 @@ if (typeof importScripts === "function") {
         "shared-translation.js",
         "shared-segmentation.js",
         "shared-vocabulary.js",
+        "shared-frequency-data.js",
+        "shared-wordfreq.js",
         "shared.js",
         "background-core.js",
         "background-subtitles.js",
@@ -42,6 +44,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch((error) => sendResponse({
                 type: "LOOKUP_WORD_RESULT", ok: false,
                 error: error?.message || String(error)
+            }));
+        return true;
+    }
+
+    if (message.type === "BATCH_LOOKUP_WORD") {
+        handleBatchLookupWord(message)
+            .then(sendResponse)
+            .catch((error) => sendResponse({
+                type: "BATCH_LOOKUP_WORD_RESULT", ok: false,
+                results: {}, error: error?.message || String(error)
             }));
         return true;
     }

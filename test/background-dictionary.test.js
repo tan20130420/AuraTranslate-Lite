@@ -109,3 +109,36 @@ test("非单词内容直接拒绝，不打网络请求", async () => {
     }
     assert.equal(calls.length, 0);
 });
+
+test("批量查词返回多个词的结果并去重", async () => {
+    const {api, calls} = load(() => jsonBody(YOUDAO_SAMPLE));
+    const response = await api.handleBatchLookupWord({words: ["approved", "Approved", "approve", "run"]});
+    assert.equal(response.ok, true);
+    assert.equal(response.type, "BATCH_LOOKUP_WORD_RESULT");
+    assert.ok(response.results.approved, "应有 approved 的释义");
+    assert.ok(response.results.approve, "应有 approve 的释义");
+    assert.ok(response.results.run, "应有 run 的释义");
+    assert.equal(calls.length, 3, "去重后只查 3 个词");
+});
+
+test("批量查词跳过非法词与超额词", async () => {
+    const {api, calls} = load(() => jsonBody(YOUDAO_SAMPLE));
+    const words = ["", "你好", "a b", "ok"].concat(Array.from({length: 70}, (_, i) => `w${i}`));
+    const response = await api.handleBatchLookupWord({words});
+    assert.equal(response.ok, true);
+    assert.ok(calls.length <= 60, "最多查 60 个词");
+    assert.ok(response.results.ok, "合法词 ok 应被查询");
+});
+
+test("批量查词中某个词失败不影响其他词", async () => {
+    const {api} = load((url) => {
+        if (decodeURIComponent(String(url)).includes("q=failme")) {
+            return {response: {ok: true, status: 200}, bodyText: "{}"};
+        }
+        return jsonBody(YOUDAO_SAMPLE);
+    });
+    const response = await api.handleBatchLookupWord({words: ["failme", "approved"]});
+    assert.equal(response.ok, true);
+    assert.equal(response.results.failme, undefined, "失败词不占位");
+    assert.ok(response.results.approved, "其他词正常返回");
+});

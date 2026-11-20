@@ -115,14 +115,9 @@ async function lookupMyMemory(word) {
     };
 }
 
-async function handleLookupWord(message) {
-    const word = normalizeLookupWord(message && message.word);
-    if (!word || word.length > 48 || !WORD_PATTERN.test(word)) {
-        return {type: "LOOKUP_WORD_RESULT", ok: false, error: "not a word"};
-    }
-
+async function lookupDict(word) {
     const cached = dictCacheGet(word);
-    if (cached) return {type: "LOOKUP_WORD_RESULT", ok: true, result: cached};
+    if (cached) return cached;
 
     let result = null;
     try {
@@ -137,8 +132,56 @@ async function handleLookupWord(message) {
             result = null;
         }
     }
-    if (!result) return {type: "LOOKUP_WORD_RESULT", ok: false, error: "no translation"};
+    if (result) dictCacheSet(word, result);
+    return result;
+}
 
-    dictCacheSet(word, result);
+async function handleLookupWord(message) {
+    const word = normalizeLookupWord(message && message.word);
+    if (!word || word.length > 48 || !WORD_PATTERN.test(word)) {
+        return {type: "LOOKUP_WORD_RESULT", ok: false, error: "not a word"};
+    }
+
+    const result = await lookupDict(word);
+    if (!result) return {type: "LOOKUP_WORD_RESULT", ok: false, error: "no translation"};
     return {type: "LOOKUP_WORD_RESULT", ok: true, result};
+}
+
+// 批量查词：按并发度分组、每组之间稍作停顿，避免触发有道的频率限制。
+// 只返回查到的词，查不到的词直接跳过，不在结果里占位。
+async function handleBatchLookupWord(message) {
+    const rawWords = Array.isArray(message && message.words) ? message.words : [];
+    const words = [];
+    const seen = new Set();
+    for (const raw of rawWords) {
+        const word = normalizeLookupWord(raw);
+        if (!word || word.length > 48 || !WORD_PATTERN.test(word) || seen.has(word)) continue;
+        seen.add(word);
+        words.push(word);
+    }
+    const max = Math.min(60, words.length);
+    const limited = words.slice(0, max);
+    const results = {};
+    const concurrency = 3;
+    const delayMs = 180;
+
+    for (let i = 0; i < limited.length; i += concurrency) {
+        const batch = limited.slice(i, i + concurrency);
+        const settled = await Promise.all(batch.map(async (word) => {
+            try {
+                const result = await lookupDict(word);
+                return result ? [word, result] : null;
+            } catch {
+                return null;
+            }
+        }));
+        for (const item of settled) {
+            if (item) results[item[0]] = item[1];
+        }
+        if (i + concurrency < limited.length) {
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+    }
+
+    return {type: "BATCH_LOOKUP_WORD_RESULT", ok: true, results};
 }

@@ -70,6 +70,10 @@
         selectionSpeakRate: 1,
         // 悬停单词词卡出现时自动朗读该英文单词；语速沿用 selectionSpeakRate。
         hoverSpeakEnabled: true,
+        // 视频词频列表：从当前视频字幕统计单词并按出现次数/通用词频排序。
+        wordFreqEnabled: true,
+        wordFreqLimit: 100,
+        wordFreqIncludeStopWords: false,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

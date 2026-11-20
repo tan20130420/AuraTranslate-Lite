@@ -36,7 +36,8 @@ function createPlayerControls() {
         button, root, menu: null, panel: null,
         data: null, view: "transcript", rows: [], query: "", limit: 200,
         activeCue: null, follow: true, menuOpen: false, styleView: false, panelOpen: false,
-        error: "", react: null, dragBound: false
+        error: "", react: null, dragBound: false,
+        wordfreq: {rows: [], count: 0, loading: false, empty: "暂无字幕", expanded: "", definitions: {}, loadingWord: "", saved: new Set(), limit: 100, computed: false}
     };
     if (globalThis.AuraContentUI) {
         globalThis.AuraContentUI.mountPlayerButton(button, {iconUrl: chrome.runtime.getURL("icons/icon-32.png")});
@@ -102,7 +103,8 @@ function buildPlayerToolsProps(ui) {
             subtitleDisplayMode: state.settings.subtitleDisplayMode,
             fontScale: state.settings.fontScale,
             subtitleBackgroundOpacity: state.settings.subtitleBackgroundOpacity,
-            subtitleColor: state.settings.subtitleColor
+            subtitleColor: state.settings.subtitleColor,
+            wordFreqEnabled: state.settings.wordFreqEnabled !== false
         },
         transcript: {
             rows: ui.rows,
@@ -116,7 +118,17 @@ function buildPlayerToolsProps(ui) {
             query: ui.query,
             follow: ui.follow
         },
-        onAction: (action) => handlePlayerControlAction(action).catch(showPlayerControlError),
+        wordfreq: {
+            rows: buildWordFreqRows(ui),
+            count: ui.wordfreq.count,
+            loading: ui.wordfreq.loading,
+            loadingWord: ui.wordfreq.loadingWord,
+            empty: ui.wordfreq.loading ? "正在统计字幕词频..." : (data && data.error) || "暂无字幕",
+            expanded: ui.wordfreq.expanded,
+            definitions: ui.wordfreq.definitions,
+            disabled: state.settings.wordFreqEnabled === false
+        },
+        onAction: (action, arg) => handlePlayerControlAction(action, arg).catch(showPlayerControlError),
         onSetting: applyPlayerSetting,
         onSearch: updatePlayerSearch,
         onFollow: updatePlayerFollow,
@@ -218,7 +230,7 @@ function showPlayerControlError(error) {
     renderPlayerTools();
 }
 
-async function handlePlayerControlAction(action) {
+async function handlePlayerControlAction(action, arg) {
     const ui = playerControls;
     if (!ui) return;
     if (action === "style") showPlayerStyle(true);
@@ -239,6 +251,31 @@ async function handlePlayerControlAction(action) {
         positionPlayerTools();
         ui.root.querySelector(".ytbt-transcript-search")?.focus();
         await loadPlayerToolCues();
+    } else if (action === "wordfreq") {
+        if (state.settings.wordFreqEnabled === false) return;
+        closePlayerMenu();
+        ui.panelOpen = true;
+        ui.view = "wordfreq";
+        renderPlayerTools();
+        positionPlayerTools();
+        await loadPlayerToolCues();
+        await computeWordFreq(false);
+    } else if (action === "wf-reload") {
+        await loadPlayerToolCues();
+        await computeWordFreq(true);
+    } else if (action === "wf-expand") {
+        ui.wordfreq.expanded = arg || "";
+        renderPlayerTools();
+        if (arg && !ui.wordfreq.definitions[arg]) lookupWordFreqDefinition(arg);
+    } else if (action === "wf-collapse") {
+        ui.wordfreq.expanded = "";
+        renderPlayerTools();
+    } else if (action === "wf-def") {
+        if (arg) await lookupWordFreqDefinition(arg);
+    } else if (action === "wf-speak") {
+        if (arg) speakWordFreqWord(arg);
+    } else if (action === "wf-save") {
+        if (arg) await saveWordFreqWord(arg);
     } else if (action === "more") {
         ui.limit += 200;
         renderPlayerTranscript();
@@ -285,11 +322,21 @@ function updatePlayerControls() {
         ui.activeCue = null;
         ui.query = "";
         ui.limit = 200;
+        if (ui.wordfreq) {
+            ui.wordfreq.computed = false;
+            ui.wordfreq.words = [];
+            ui.wordfreq.count = 0;
+            ui.wordfreq.expanded = "";
+            ui.wordfreq.definitions = {};
+            ui.wordfreq.saved = new Set();
+        }
         if (ui.panelOpen) loadPlayerToolCues();
+        if (ui.panelOpen && ui.view === "wordfreq") computeWordFreq(false);
     }
     if (ui.panelOpen) {
         clampPlayerPanel();
         if (ui.view === "transcript") renderPlayerTranscript();
+        else if (ui.view === "wordfreq" && ui.wordfreq.computed && !ui.wordfreq.words.length) computeWordFreq(false);
     }
 }
 
@@ -369,6 +416,119 @@ function renderPlayerTranscript() {
         const list = ui.root.querySelector(".ytbt-cue-list");
         const row = list && list.querySelector('.ytbt-cue-row[aria-current="true"]');
         if (list && row) list.scrollTop = Math.max(0, row.offsetTop - list.offsetTop - list.clientHeight / 3);
+    }
+}
+
+function buildWordFreqRows() {
+    const wf = playerControls && playerControls.wordfreq;
+    if (!wf || !wf.words) return [];
+    return wf.words.map((entry) => ({
+        ...entry,
+        saved: wf.saved.has(entry.word)
+    }));
+}
+
+function computeWordFreq(force) {
+    const ui = playerControls;
+    if (!ui) return Promise.resolve();
+    const wf = ui.wordfreq;
+    if (!force && wf.computed) return Promise.resolve();
+    const cues = Core.getCaptionDisplayCues(playerToolCues());
+    if (!cues.length) {
+        wf.words = [];
+        wf.count = 0;
+        wf.computed = false;
+        renderPlayerTools();
+        return Promise.resolve();
+    }
+    wf.loading = true;
+    wf.computed = true;
+    renderPlayerTools();
+    const limit = Math.max(20, Math.min(500, Number(state.settings.wordFreqLimit) || 100));
+    const includeStop = Boolean(state.settings.wordFreqIncludeStopWords);
+    return Promise.resolve().then(() => {
+        const analysis = Core.wordFreqAnalyze
+            ? Core.wordFreqAnalyze(cues, {includeStopWords: includeStop, minLength: 3})
+            : {words: []};
+        wf.words = analysis.words.slice(0, limit);
+        wf.count = analysis.words.length;
+    }).catch((error) => {
+        wf.words = [];
+        wf.count = 0;
+        wf.error = error && error.message ? error.message : String(error);
+    }).then(() => {
+        wf.loading = false;
+        renderPlayerTools();
+    });
+}
+
+async function lookupWordFreqDefinition(word) {
+    const ui = playerControls;
+    if (!ui) return;
+    const wf = ui.wordfreq;
+    if (wf.definitions[word]) return;
+    wf.loadingWord = word;
+    renderPlayerTools();
+    try {
+        const response = await Core.sendRuntimeMessage(chrome.runtime, {
+            type: "BATCH_LOOKUP_WORD", words: [word]
+        }, 12000);
+        const results = response && response.results;
+        if (results && results[word]) wf.definitions[word] = results[word];
+    } catch (error) {
+        // 查词失败不打扰用户，词条下方会提示重试。
+    } finally {
+        wf.loadingWord = "";
+        renderPlayerTools();
+    }
+}
+
+function speakWordFreqWord(word) {
+    if (typeof window === "undefined" || !window.speechSynthesis ||
+        typeof window.SpeechSynthesisUtterance !== "function") return;
+    try {
+        window.speechSynthesis.cancel();
+        const utterance = new window.SpeechSynthesisUtterance(word);
+        utterance.lang = "en-US";
+        const rate = Number(state.settings.selectionSpeakRate);
+        utterance.rate = rate > 0 ? rate : 1;
+        const voices = window.speechSynthesis.getVoices() || [];
+        const local = voices.find((v) => /^en\b/i.test(v.lang || "") && v.localService);
+        const anyEn = voices.find((v) => /^en\b/i.test(v.lang || ""));
+        if (local || anyEn) utterance.voice = local || anyEn;
+        window.speechSynthesis.speak(utterance);
+    } catch (error) {
+        // 语音不可用时静默跳过。
+    }
+}
+
+async function saveWordFreqWord(word) {
+    const ui = playerControls;
+    if (!ui || ui.wordfreq.saved.has(word)) return;
+    const entry = ui.wordfreq.words.find((item) => item.word === word);
+    const definition = ui.wordfreq.definitions[word];
+    const translatedText = definition && definition.entries
+        ? definition.entries.map((item) => item.variants.join("，")).join("；")
+        : word;
+    const settings = state.settings || {};
+    try {
+        await Core.sendRuntimeMessage(chrome.runtime, {
+            type: "VOCABULARY",
+            action: "add",
+            entry: {
+                sourceText: word,
+                translatedText,
+                sourceLanguage: settings.sourceLanguage || "en",
+                targetLanguage: settings.targetLanguage || "zh-CN",
+                contextText: (entry && entry.forms && entry.forms.join(" / ")) || "",
+                sourceUrl: location.href,
+                sourceTitle: document.title
+            }
+        }, 8000);
+        ui.wordfreq.saved.add(word);
+        renderPlayerTools();
+    } catch (error) {
+        showPlayerControlError(error);
     }
 }
 

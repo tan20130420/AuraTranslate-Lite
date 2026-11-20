@@ -3,6 +3,7 @@ import {useSettings} from "./useSettings";
 import {TranslationSettings} from "./TranslationSettings";
 import {GeneralSettings} from "./GeneralSettings";
 import {SelectionSettings} from "./SelectionSettings";
+import {WordFreqSettings} from "./WordFreqSettings";
 import {Vocabulary} from "./Vocabulary";
 import {Icon} from "../shared/Icon";
 
@@ -10,6 +11,7 @@ const PAGES = [
     ["realtime-api", "实时字幕", "视频双语字幕"],
     ["immersive-api", "沉浸式翻译", "网页翻译"],
     ["selection-settings", "划词翻译", "所选文字与上下文"],
+    ["wordfreq-settings", "视频词频", "统计字幕里的高频词"],
     ["vocabulary", "生词本", "收藏、复习与学习状态"],
     ["general-settings", "通用设置", "外观与缓存"],
 ];
@@ -134,6 +136,8 @@ export function OptionsApp() {
                                 />
                                 <SelectionSettings settings={settings} update={update}
                                                    hidden={page !== "selection-settings"} navigate={navigate}/>
+                                <WordFreqSettings settings={settings} update={update}
+                                                   hidden={page !== "wordfreq-settings"} navigate={navigate}/>
                                 <Vocabulary hidden={page !== "vocabulary"} navigate={navigate}/>
                                 <GeneralSettings
                                     settings={settings}

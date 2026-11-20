@@ -14,6 +14,7 @@ const SUB_PAGES = [
   "realtime-api",
   "immersive-api",
   "selection-settings",
+  "wordfreq-settings",
   "vocabulary",
   "general-settings",
 ];

@@ -12,6 +12,8 @@
         require("./shared-translation.js")(Shared);
         require("./shared-segmentation.js")(Shared);
         require("./shared-vocabulary.js")(Shared);
+        require("./shared-frequency-data.js")(Shared);
+        require("./shared-wordfreq.js")(Shared);
     }
     const api = {
         DEFAULT_SETTINGS: Shared.DEFAULT_SETTINGS,
@@ -92,7 +94,12 @@
         parseDeepSeekTranslationContent: Shared.parseDeepSeekTranslationContent,
         buildImmersivePageContext: Shared.buildImmersivePageContext,
         normalizeImmersivePageContext: Shared.normalizeImmersivePageContext,
-        parseImmersiveContextContent: Shared.parseImmersiveContextContent
+        parseImmersiveContextContent: Shared.parseImmersiveContextContent,
+        wordFreqTokenize: Shared.wordFreqTokenize,
+        wordFreqStem: Shared.wordFreqStem,
+        wordFreqAnalyze: Shared.wordFreqAnalyze,
+        wordFreqIsKnown: Shared.wordFreqIsKnown,
+        WORD_FREQUENCY_LEVELS: Shared.WORD_FREQUENCY_LEVELS
     };
     root.YTBTCore = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

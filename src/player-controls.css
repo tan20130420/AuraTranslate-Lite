@@ -96,3 +96,26 @@
 .ytbt-player-ui[data-theme="dark"] :is(.ytbt-cue-row time, .ytbt-summary-status) { color: #b5a1ee; }
 .ytbt-player-ui[data-theme="dark"] .ytbt-cue-row[aria-current="true"] { background: #393045; }
 .ytbt-player-ui[data-theme="dark"] .ytbt-primary-button { background: #7252bd; }
+
+/* 视频词频视图 */
+.ytbt-wordfreq-toolbar { justify-content: space-between; }
+.ytbt-wordfreq-hint { font-size: 12px; color: #72638e; }
+.ytbt-wordfreq-list { display: block; }
+.ytbt-player-ui .ytbt-wordfreq-row { border-top: 1px solid #e9e9ee; }
+.ytbt-player-ui .ytbt-wordfreq-row:hover { background: #efeff3; }
+.ytbt-wordfreq-head { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 12px; text-align: left; }
+.ytbt-wf-level { flex: 0 0 auto; min-width: 34px; padding: 2px 6px; border-radius: 4px; font-size: 11px; text-align: center; color: white; }
+.ytbt-wf-level.level-core { background: #9aa0aa; }
+.ytbt-wf-level.level-common { background: #3f8f6d; }
+.ytbt-wf-level.level-advanced { background: #c98a2e; }
+.ytbt-wf-level.level-rare { background: #b3476b; }
+.ytbt-wf-level.level-unknown { background: #7252bd; }
+.ytbt-wf-word { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.ytbt-wf-count { flex: 0 0 auto; font-size: 12px; color: #72638e; font-variant-numeric: tabular-nums; }
+.ytbt-wordfreq-detail { padding: 0 12px 10px 52px; }
+.ytbt-wf-forms { margin: 0 0 4px; font-size: 12px; color: #72638e; }
+.ytbt-wf-meaning { margin: 0 0 6px; font-size: 13px; line-height: 1.5; }
+.ytbt-wf-actions { display: flex; gap: 6px; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-wordfreq-row { border-color: #3b393f; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-wordfreq-row:hover { background: #313034; }
+.ytbt-player-ui[data-theme="dark"] :is(.ytbt-wordfreq-hint, .ytbt-wf-count, .ytbt-wf-forms) { color: #b4b1bc; }

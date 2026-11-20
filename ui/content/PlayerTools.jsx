@@ -11,6 +11,10 @@ const ICON_PATHS = {
     back: "m14 5-7 7 7 7",
     copy: "M8 8h12v13H8zM16 8V3H3v13h5",
     reset: "M3 10a9 9 0 1 1 2 8M3 4v6h6",
+    book: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 5v16",
+    volume: "M4 9v6h4l5 4V5L8 9zM17 9a4 4 0 0 1 0 6",
+    plus: "M12 5v14M5 12h14",
+    check: "m5 12 4 4L19 6",
 };
 
 function Icon({name}) {
@@ -118,10 +122,76 @@ function TranscriptView({transcript, view, onAction, onSearch, onFollow, onSeek}
     );
 }
 
+const LEVEL_LABEL = {core: "基础", common: "常见", advanced: "进阶", rare: "少见", unknown: "其他"};
+
+function WordFreqView({wordfreq, view, onAction}) {
+    return (
+        <div className="ytbt-wordfreq-view" hidden={view !== "wordfreq"}>
+            <div className="ytbt-list-toolbar ytbt-wordfreq-toolbar">
+                <span className="ytbt-wordfreq-hint">按出现次数排序 · 点词条看释义</span>
+                <button type="button" className="ytbt-text-button" data-action="wf-reload"
+                        hidden={wordfreq.loading}
+                        onClick={() => onAction("wf-reload")}>重新统计</button>
+            </div>
+            <div className="ytbt-cue-list ytbt-wordfreq-list" tabIndex={0} aria-label="视频词频列表">
+                {wordfreq.rows.map((row, index) => {
+                    const expanded = wordfreq.expanded === row.word;
+                    const definition = wordfreq.definitions[row.word];
+                    const meanings = definition && definition.entries
+                        ? definition.entries.map((entry) => [entry.pos, entry.variants.join("，")].filter(Boolean).join(" ")).join("；")
+                        : "";
+                    return (
+                        <div key={row.word} className={`ytbt-wordfreq-row${expanded ? " expanded" : ""}`}>
+                            <button type="button" className="ytbt-wordfreq-head" data-word={row.word}
+                                    aria-expanded={expanded ? "true" : "false"}
+                                    onClick={() => onAction(expanded ? "wf-collapse" : "wf-expand", row.word)}>
+                                <span className={`ytbt-wf-level level-${row.level}`}>{LEVEL_LABEL[row.level] || "其他"}</span>
+                                <span className="ytbt-wf-word">{row.word}</span>
+                                <span className="ytbt-wf-count">{row.count} 次</span>
+                            </button>
+                            {expanded && (
+                                <div className="ytbt-wordfreq-detail">
+                                    <p className="ytbt-wf-forms">出现形式：{row.forms.join(" / ")}</p>
+                                    <p className="ytbt-wf-meaning">
+                                        {wordfreq.loadingWord === row.word
+                                            ? "正在查询释义..."
+                                            : (meanings || (definition ? "未找到释义" : "点下方按钮查询释义"))}
+                                    </p>
+                                    <div className="ytbt-wf-actions">
+                                        <button type="button" className="ytbt-icon-button" data-action="wf-speak"
+                                                title="朗读" aria-label="朗读" onClick={() => onAction("wf-speak", row.word)}>
+                                            <Icon name="volume"/>
+                                        </button>
+                                        <button type="button" className="ytbt-icon-button" data-action="wf-def"
+                                                title="查释义" aria-label="查释义" onClick={() => onAction("wf-def", row.word)}>
+                                            <Icon name="book"/>
+                                        </button>
+                                        <button type="button" className="ytbt-icon-button" data-action="wf-save"
+                                                title={row.saved ? "已收藏" : "收藏到生词本"} aria-label="收藏到生词本"
+                                                onClick={() => onAction("wf-save", row.word)}>
+                                            <Icon name={row.saved ? "check" : "plus"}/>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+                {!wordfreq.rows.length && (
+                    <p className="ytbt-list-empty">{wordfreq.empty}</p>
+                )}
+            </div>
+            <footer className="ytbt-list-footer">
+                <span className="ytbt-cue-count">{wordfreq.count} 个词条</span>
+            </footer>
+        </div>
+    );
+}
+
 export function PlayerTools(props) {
     const {
         menuOpen, styleView, panelOpen, view, error, settings,
-        transcript, onAction, onSetting, onSearch, onFollow, onSeek,
+        transcript, wordfreq, onAction, onSetting, onSearch, onFollow, onSeek,
     } = props;
     return (
         <>
@@ -137,6 +207,7 @@ export function PlayerTools(props) {
                     </label>
                     <MenuRow icon="settings" action="style" trailing="›" onAction={onAction}>字幕样式</MenuRow>
                     <MenuRow icon="list" action="transcript" onAction={onAction}>悬浮字幕列表</MenuRow>
+                    {settings.wordFreqEnabled !== false && <MenuRow icon="book" action="wordfreq" onAction={onAction}>视频词频</MenuRow>}
                 </div>
                 {styleView && <StyleFields settings={settings} onSetting={onSetting} onAction={onAction}/>}
                 <p className="ytbt-tools-error" role="status" hidden={!error}>{error}</p>
@@ -147,12 +218,17 @@ export function PlayerTools(props) {
                     <button type="button" data-action="transcript"
                             aria-pressed={view === "transcript"}
                             onClick={() => onAction("transcript")}>字幕列表</button>
+                    <button type="button" data-action="wordfreq"
+                            aria-pressed={view === "wordfreq"}
+                            hidden={wordfreq.disabled}
+                            onClick={() => onAction("wordfreq")}>视频词频</button>
                     <button type="button" className="ytbt-icon-button" data-action="close-panel"
                             title="关闭面板" aria-label="关闭面板"
                             onClick={() => onAction("close-panel")}><Icon name="close"/></button>
                 </div>
                 <TranscriptView transcript={transcript} view={view} onAction={onAction} onSearch={onSearch}
                                 onFollow={onFollow} onSeek={onSeek}/>
+                {wordfreq && <WordFreqView wordfreq={wordfreq} view={view} onAction={onAction}/>}
             </section>
         </>
     );

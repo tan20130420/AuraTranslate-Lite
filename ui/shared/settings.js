@@ -89,6 +89,9 @@ export function settingsPatch(settings) {
         "selectionSpeakEnabled",
         "selectionSpeakRate",
         "hoverSpeakEnabled",
+        "wordFreqEnabled",
+        "wordFreqLimit",
+        "wordFreqIncludeStopWords",
         "llmSentenceSegmentationEnabled",
         "asrCorrectionEnabled",
         "showOriginalTechnicalTerms",
@@ -119,6 +122,8 @@ export function settingsPatch(settings) {
         subtitleTranslationMode:
             s.subtitleTranslationMode === "full" ? "full" : "economy",
         subtitleLookAheadMinutes: Number(s.subtitleLookAheadMinutes || 2),
+        wordFreqLimit: Math.max(20, Math.min(500, Number(s.wordFreqLimit) || 100)),
+        wordFreqEnabled: s.wordFreqEnabled !== false,
     };
 }
 
