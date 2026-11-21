@@ -132,3 +132,30 @@ test("phrase enabled toggle persists", async (t) => {
   await page.save();
   assert.equal(page.storage.phraseEnabled, false);
 });
+
+test("phrase library lists built-in entries with search and show-more", async (t) => {
+  const page = await openLibrary(t);
+  const builtin = page.$("#phrase-library .builtin-library");
+  assert.ok(builtin, "built-in library section exists");
+  assert.match(builtin.textContent, /543 条/);
+  const rows = () => [...builtin.querySelectorAll(".builtin-entry")];
+  assert.equal(rows().length, 50, "shows first 50 by default");
+  const more = builtin.querySelector(".builtin-more");
+  assert.ok(more, "show-more button present");
+  assert.match(more.textContent, /还有 493 条/);
+  click(more);
+  assert.equal(rows().length, 100, "show-more reveals next batch");
+
+  const search = page.$("#builtin-search");
+  setValue(search, "figure out");
+  const filtered = rows();
+  assert.ok(filtered.length > 0 && filtered.length < 100);
+  assert.ok(filtered.some((row) => /figure out/i.test(row.textContent)));
+});
+
+test("phrase library built-in section is read-only (no edit/delete buttons)", async (t) => {
+  const page = await openLibrary(t);
+  const builtin = page.$("#phrase-library .builtin-library");
+  const buttons = [...builtin.querySelectorAll("button")].map((b) => b.textContent);
+  assert.ok(!buttons.some((text) => /编辑|删除/.test(text)), "built-in entries have no edit/delete controls");
+});

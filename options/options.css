@@ -1571,3 +1571,15 @@ button.vocabulary-review-start:disabled { opacity: .55; cursor: default; box-sha
 .phrase-editor > small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; }
 .phrase-editor-actions { display: flex; gap: 10px; margin-top: 14px; }
 .vocabulary-word { font-size: 14px; color: var(--ink); }
+
+/* Built-in phrase library (read-only browse) */
+.builtin-library { margin: 24px 0 8px; padding: 20px; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; }
+.builtin-library-head h3, .custom-library-heading { margin: 0 0 6px; font-size: 16px; color: var(--ink); }
+.builtin-library-head p { margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.builtin-count { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 20px; background: var(--subtle); color: var(--muted); font-size: 11px; font-weight: 500; }
+.builtin-list { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 8px; max-height: 520px; overflow-y: auto; }
+.builtin-entry { padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--page-bg, transparent); }
+.builtin-entry-head { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+.builtin-entry .vocabulary-translation { margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.builtin-more { margin-top: 4px; }
+.custom-library-heading { margin: 28px 0 0; padding-top: 24px; border-top: 1px solid var(--border); }

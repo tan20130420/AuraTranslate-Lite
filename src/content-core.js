@@ -106,28 +106,68 @@ var state = {
 
 
 // --- chrome.storage promise wrappers ---
+// Defensive: some hosts inject a page-level `chrome` shim that shadows the
+// extension API, leaving `chrome.storage` undefined. Degrade gracefully instead
+// of throwing (which used to abort subtitle loading with a "reading 'local'" error).
+function storageArea() {
+    return (typeof chrome !== "undefined" && chrome && chrome.storage && chrome.storage.local)
+        ? chrome.storage.local : null;
+}
+
+function defaultValues(defaults) {
+    if (defaults == null) return {};
+    if (typeof defaults === "string") return {};
+    const out = {};
+    for (const key of Object.keys(defaults)) out[key] = defaults[key];
+    return out;
+}
+
 function storageGet(defaults) {
-    return new Promise((resolve, reject) => chrome.storage.local.get(defaults, (values) => {
-        const error = chrome.runtime && chrome.runtime.lastError;
-        if (error) reject(new Error(`读取本地字幕缓存失败：${error.message}`));
-        else resolve(values);
-    }));
+    const area = storageArea();
+    if (!area) return Promise.resolve(defaultValues(defaults));
+    return new Promise((resolve, reject) => {
+        try {
+            area.get(defaults, (values) => {
+                const error = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError);
+                if (error) reject(new Error(`读取本地字幕缓存失败：${error.message}`));
+                else resolve(values || defaultValues(defaults));
+            });
+        } catch (error) {
+            resolve(defaultValues(defaults));
+        }
+    });
 }
 
 function storageSet(values) {
-    return new Promise((resolve, reject) => chrome.storage.local.set(values, () => {
-        const error = chrome.runtime && chrome.runtime.lastError;
-        if (error) reject(new Error(`保存本地字幕缓存失败：${error.message}`));
-        else resolve();
-    }));
+    const area = storageArea();
+    if (!area) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        try {
+            area.set(values, () => {
+                const error = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError);
+                if (error) reject(new Error(`保存本地字幕缓存失败：${error.message}`));
+                else resolve();
+            });
+        } catch (error) {
+            resolve();
+        }
+    });
 }
 
 function storageRemove(keys) {
-    return new Promise((resolve, reject) => chrome.storage.local.remove(keys, () => {
-        const error = chrome.runtime && chrome.runtime.lastError;
-        if (error) reject(new Error(`整理本地字幕缓存失败：${error.message}`));
-        else resolve();
-    }));
+    const area = storageArea();
+    if (!area) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+        try {
+            area.remove(keys, () => {
+                const error = (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.lastError);
+                if (error) reject(new Error(`整理本地字幕缓存失败：${error.message}`));
+                else resolve();
+            });
+        } catch (error) {
+            resolve();
+        }
+    });
 }
 
 

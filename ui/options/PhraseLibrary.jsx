@@ -33,9 +33,25 @@ export function PhraseLibrary({hidden, navigate, settings, update}) {
     const [editingIndex, setEditingIndex] = useState(-1);
     const [notice, setNotice] = useState(null);
     const [busy, setBusy] = useState(false);
+    const [builtInQuery, setBuiltInQuery] = useState("");
+    const [builtInFilter, setBuiltInFilter] = useState("all");
+    const [builtInLimit, setBuiltInLimit] = useState(50);
 
-    const builtInCount = useMemo(() => (Core.phraseLibraryAll ? Core.phraseLibraryAll().length : 0), []);
+    const builtIn = useMemo(() => (Core.phraseLibraryAll ? Core.phraseLibraryAll() : []), []);
+    const builtInCount = builtIn.length;
     const customCount = custom ? custom.length : 0;
+
+    const filteredBuiltIn = useMemo(() => {
+        const q = builtInQuery.trim().toLocaleLowerCase();
+        return builtIn.filter((entry) => {
+            const e = fromEntry(entry);
+            if (builtInFilter !== "all" && e.type !== builtInFilter) return false;
+            if (!q) return true;
+            return `${e.phrase} ${e.meaning} ${e.tags}`.toLocaleLowerCase().includes(q);
+        });
+    }, [builtIn, builtInQuery, builtInFilter]);
+
+    useEffect(() => { setBuiltInLimit(50); }, [builtInQuery, builtInFilter]);
 
     async function load() {
         try {
@@ -136,6 +152,50 @@ export function PhraseLibrary({hidden, navigate, settings, update}) {
                 <span>启用“短语与俚语”<small>关闭后，播放器菜单里不再显示短语入口。</small></span>
             </label>
 
+            <div className="builtin-library">
+                <div className="builtin-library-head">
+                    <h3>内置词库 <span className="builtin-count">{builtInCount} 条</span></h3>
+                    <p>这些是随插件附带的常用表达，始终生效、不可删除。可搜索查看，或在下方添加自己的词条覆盖同名释义。</p>
+                </div>
+                <div className="vocabulary-toolbar">
+                    <label className="vocabulary-search"><span className="sr-only">搜索内置词条</span>
+                        <input id="builtin-search" type="search" placeholder="搜索内置词条（英文或释义）"
+                               aria-label="搜索内置词条" value={builtInQuery}
+                               onChange={(event) => setBuiltInQuery(event.target.value)}/>
+                    </label>
+                    <select id="builtin-filter" aria-label="按类型筛选内置词条" value={builtInFilter}
+                            onChange={(event) => setBuiltInFilter(event.target.value)}>
+                        <option value="all">全部类型</option>
+                        {TYPES.map((type) => <option key={type} value={type}>{TYPE_LABEL[type] || type}</option>)}
+                    </select>
+                </div>
+                <div className="builtin-list">
+                    {filteredBuiltIn.slice(0, builtInLimit).map((entry, index) => {
+                        const e = fromEntry(entry);
+                        return (
+                            <div className="builtin-entry" key={`${index}-${e.phrase}`}>
+                                <div className="builtin-entry-head">
+                                    <strong className="vocabulary-word">{e.phrase}</strong>
+                                    <span className="vocabulary-meta">{TYPE_LABEL[e.type] || e.type} · {e.level}</span>
+                                </div>
+                                <div className="vocabulary-translation">{e.meaning}</div>
+                            </div>
+                        );
+                    })}
+                    {filteredBuiltIn.length === 0 && (
+                        <p className="vocabulary-empty">没有匹配的内置词条。</p>
+                    )}
+                </div>
+                {filteredBuiltIn.length > builtInLimit && (
+                    <button type="button" className="secondary builtin-more"
+                            onClick={() => setBuiltInLimit((n) => n + 50)}>
+                        显示更多（还有 {filteredBuiltIn.length - builtInLimit} 条）
+                    </button>
+                )}
+                <p className="vocabulary-count">显示 {Math.min(builtInLimit, filteredBuiltIn.length)} / {filteredBuiltIn.length} 条内置词条</p>
+            </div>
+
+            <h3 className="custom-library-heading">我的自定义词条</h3>
             <div className="vocabulary-toolbar">
                 <label className="vocabulary-search"><span className="sr-only">搜索我的词条</span>
                     <input id="phrase-search" type="search" placeholder="搜索我的词条"
