@@ -98,6 +98,7 @@
 .ytbt-player-ui[data-theme="dark"] .ytbt-primary-button { background: #7252bd; }
 
 /* 视频词频视图 */
+.ytbt-wordfreq-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 .ytbt-wordfreq-toolbar { justify-content: space-between; }
 .ytbt-wordfreq-hint { font-size: 12px; color: #72638e; }
 .ytbt-wordfreq-list { display: block; }
@@ -116,6 +117,24 @@
 .ytbt-wf-forms { margin: 0 0 4px; font-size: 12px; color: #72638e; }
 .ytbt-wf-meaning { margin: 0 0 6px; font-size: 13px; line-height: 1.5; }
 .ytbt-wf-actions { display: flex; gap: 6px; }
+.ytbt-wf-examples { margin-top: 10px; border-top: 1px solid #e9e9ee; padding-top: 8px; }
+.ytbt-wf-examples-title { margin: 0 0 6px; font-size: 12px; color: #72638e; }
+.ytbt-player-ui .ytbt-wf-example { display: flex; width: 100%; gap: 8px; padding: 6px 6px; text-align: left; line-height: 1.5; border-radius: 4px; }
+.ytbt-player-ui .ytbt-wf-example:hover { background: #efeff3; }
+.ytbt-wf-example time { flex: 0 0 42px; color: #72638e; font-size: 12px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.ytbt-wf-example > span { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.ytbt-wf-example mark { background: #fff0a8; color: inherit; border-radius: 2px; padding: 0 1px; }
+.ytbt-wf-examples .ytbt-text-button { margin-top: 4px; padding-left: 0; }
 .ytbt-player-ui[data-theme="dark"] .ytbt-wordfreq-row { border-color: #3b393f; }
 .ytbt-player-ui[data-theme="dark"] .ytbt-wordfreq-row:hover { background: #313034; }
-.ytbt-player-ui[data-theme="dark"] :is(.ytbt-wordfreq-hint, .ytbt-wf-count, .ytbt-wf-forms) { color: #b4b1bc; }
+.ytbt-player-ui[data-theme="dark"] :is(.ytbt-wordfreq-hint, .ytbt-wf-count, .ytbt-wf-forms, .ytbt-wf-examples-title, .ytbt-wf-example time) { color: #b4b1bc; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-wf-examples { border-color: #3b393f; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-wf-example:hover { background: #313034; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-wf-example mark { background: #6b5a1f; color: #ffeaa0; }
+
+/* Phrase / idiom / slang view reuses most wordfreq styles. */
+.ytbt-phrase-view .ytbt-wordfreq-head { gap: 8px; }
+.ytbt-ph-type { flex: 0 0 auto; min-width: 52px; padding: 2px 6px; border-radius: 4px; font-size: 11px; text-align: center; background: #ece7f7; color: #5b438f; }
+.ytbt-phrase-view .ytbt-wordfreq-row:hover { background: #f4f0fb; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-ph-type { background: #3b3050; color: #c9b6f0; }
+.ytbt-player-ui[data-theme="dark"] .ytbt-phrase-view .ytbt-wordfreq-row:hover { background: #313034; }

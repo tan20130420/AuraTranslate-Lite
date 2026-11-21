@@ -4,6 +4,7 @@ import {TranslationSettings} from "./TranslationSettings";
 import {GeneralSettings} from "./GeneralSettings";
 import {SelectionSettings} from "./SelectionSettings";
 import {WordFreqSettings} from "./WordFreqSettings";
+import {PhraseLibrary} from "./PhraseLibrary";
 import {Vocabulary} from "./Vocabulary";
 import {Icon} from "../shared/Icon";
 
@@ -12,6 +13,7 @@ const PAGES = [
     ["immersive-api", "沉浸式翻译", "网页翻译"],
     ["selection-settings", "划词翻译", "所选文字与上下文"],
     ["wordfreq-settings", "视频词频", "统计字幕里的高频词"],
+    ["phrase-library", "我的词库", "管理短语、习语与俚语"],
     ["vocabulary", "生词本", "收藏、复习与学习状态"],
     ["general-settings", "通用设置", "外观与缓存"],
 ];
@@ -83,7 +85,7 @@ export function OptionsApp() {
         navigate(PAGES[(next + PAGES.length) % PAGES.length][0], true);
     }
 
-    const ICONS = ["subtitles", "webpage", "translate", "book", "settings"];
+    const ICONS = ["subtitles", "webpage", "translate", "book", "plus", "book", "settings"];
 
     return (
         <main className="page">
@@ -138,6 +140,8 @@ export function OptionsApp() {
                                                    hidden={page !== "selection-settings"} navigate={navigate}/>
                                 <WordFreqSettings settings={settings} update={update}
                                                    hidden={page !== "wordfreq-settings"} navigate={navigate}/>
+                                <PhraseLibrary settings={settings} update={update}
+                                               hidden={page !== "phrase-library"} navigate={navigate}/>
                                 <Vocabulary hidden={page !== "vocabulary"} navigate={navigate}/>
                                 <GeneralSettings
                                     settings={settings}

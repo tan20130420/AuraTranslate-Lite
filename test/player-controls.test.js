@@ -349,3 +349,77 @@ test("disabled subtitles do not start caption preparation on navigation", (t) =>
     assert.equal(f.win.state.videoId, "two");
     assert.equal(loads, 0);
 });
+
+test("wordfreq examples are built with highlighted cues and seek jumps without leaving the wordfreq view", async (t) => {
+    const f = fixture(t, {wordFreqEnabled: true, wordFreqLimit: 100});
+    f.win.state.cues = [
+        {id: "0", startMs: 5000, endMs: 9000, sourceText: "He runs every morning.", status: "translated"},
+        {id: "1", startMs: 15000, endMs: 19000, sourceText: "His running habit is strong.", status: "translated"}
+    ];
+    await f.win.handlePlayerControlAction("wordfreq");
+    await tick();
+    const wf = f.win.playerControls.wordfreq;
+    assert.equal(wf.view, undefined, "view lives on ui, not wordfreq");
+    const rows = f.win.buildWordFreqRows();
+    const run = rows.find((entry) => entry.word === "run");
+    assert.ok(run, "run should be counted");
+    assert.equal(run.examples.length, 2, "two example sentences for run");
+    assert.equal(run.examples[0].start, "00:05");
+    assert.ok(run.examples[0].parts.some((part) => part.hit), "matched form should be highlighted");
+    assert.equal(f.win.playerControls.view, "wordfreq");
+
+    await f.win.handlePlayerControlAction("wf-example-seek", {cue: run.examples[1].cue});
+    assert.equal(f.win.state.video.currentTime, 15, "seek to second example time");
+    assert.equal(f.win.playerControls.view, "wordfreq", "seek keeps wordfreq view");
+    assert.equal(f.win.playerControls.panelOpen, true, "panel stays open");
+
+    assert.equal(f.win.playerControls.wordfreq.examplesAll, false);
+    await f.win.handlePlayerControlAction("wf-examples-all");
+    assert.equal(f.win.playerControls.wordfreq.examplesAll, true, "toggle expands all examples");
+    await f.win.handlePlayerControlAction("wf-examples-all");
+    assert.equal(f.win.playerControls.wordfreq.examplesAll, false, "toggle collapses again");
+});
+
+test("phrase panel detects library phrases with highlighted examples and seek stays in view", async (t) => {
+    const f = fixture(t, {phraseEnabled: true});
+    f.win.state.cues = [
+        {id: "0", startMs: 5000, endMs: 9000, sourceText: "Let me figure out this problem.", status: "translated"},
+        {id: "1", startMs: 15000, endMs: 19000, sourceText: "She broke the ice at the party.", status: "translated"}
+    ];
+    await f.win.handlePlayerControlAction("phrase");
+    await tick();
+    const ph = f.win.playerControls.phrase;
+    assert.equal(f.win.playerControls.view, "phrase");
+    const rows = f.win.buildPhraseRows();
+    const figure = rows.find((entry) => entry.phrase === "figure out");
+    assert.ok(figure, "figure out should be detected");
+    assert.equal(figure.type, "phrasal");
+    assert.ok(figure.meaning, "built-in meaning is present");
+    assert.ok(figure.examples.length >= 1, "example sentence built");
+    assert.ok(figure.examples[0].parts.some((part) => part.hit), "matched phrase highlighted");
+
+    await f.win.handlePlayerControlAction("ph-expand", "figure out");
+    assert.equal(ph.expanded, "figure out");
+    await f.win.handlePlayerControlAction("ph-example-seek", {cue: figure.examples[0].cue});
+    assert.equal(f.win.state.video.currentTime, 5, "seek to example time");
+    assert.equal(f.win.playerControls.view, "phrase", "seek keeps phrase view");
+    assert.equal(f.win.playerControls.panelOpen, true);
+
+    assert.equal(ph.examplesAll, false);
+    await f.win.handlePlayerControlAction("ph-examples-all");
+    assert.equal(ph.examplesAll, true);
+    await f.win.handlePlayerControlAction("ph-collapse");
+    assert.equal(ph.expanded, "");
+});
+
+test("phrase panel merges custom entries from storage", async (t) => {
+    const f = fixture(t, {phraseEnabled: true});
+    f.stored.auraPhraseLibraryCustom = [["my custom phrase", "idiom", "自定义", "daily", "B2"]];
+    f.win.state.cues = [
+        {id: "0", startMs: 0, endMs: 4000, sourceText: "This is my custom phrase here.", status: "translated"}
+    ];
+    await f.win.handlePlayerControlAction("phrase");
+    await tick();
+    const rows = f.win.buildPhraseRows();
+    assert.ok(rows.find((entry) => entry.phrase === "my custom phrase"), "custom entry detected in video");
+});

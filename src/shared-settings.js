@@ -74,6 +74,8 @@
         wordFreqEnabled: true,
         wordFreqLimit: 100,
         wordFreqIncludeStopWords: false,
+        // 视频短语/俚语列表：从字幕中识别词库里的短语、习语、搭配与俚语。
+        phraseEnabled: true,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

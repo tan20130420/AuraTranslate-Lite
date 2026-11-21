@@ -14,6 +14,7 @@
         require("./shared-vocabulary.js")(Shared);
         require("./shared-frequency-data.js")(Shared);
         require("./shared-wordfreq.js")(Shared);
+        require("./shared-phrase-library.js")(Shared);
     }
     const api = {
         DEFAULT_SETTINGS: Shared.DEFAULT_SETTINGS,
@@ -99,7 +100,18 @@
         wordFreqStem: Shared.wordFreqStem,
         wordFreqAnalyze: Shared.wordFreqAnalyze,
         wordFreqIsKnown: Shared.wordFreqIsKnown,
-        WORD_FREQUENCY_LEVELS: Shared.WORD_FREQUENCY_LEVELS
+        WORD_FREQUENCY_LEVELS: Shared.WORD_FREQUENCY_LEVELS,
+        phraseLibraryAll: Shared.phraseLibraryAll,
+        phraseLibraryByType: Shared.phraseLibraryByType,
+        phraseLibraryNormalize: Shared.phraseLibraryNormalize,
+        phraseLibraryMerge: Shared.phraseLibraryMerge,
+        phraseLibraryTokenize: Shared.phraseLibraryTokenize,
+        phraseLibraryFormsFor: Shared.phraseLibraryFormsFor,
+        phraseLibraryAnalyze: Shared.phraseLibraryAnalyze,
+        PHRASE_LIBRARY_TYPES: Shared.PHRASE_LIBRARY_TYPES,
+        PHRASE_LIBRARY_TAGS: Shared.PHRASE_LIBRARY_TAGS,
+        PHRASE_LIBRARY_LEVELS: Shared.PHRASE_LIBRARY_LEVELS,
+        PHRASE_CUSTOM_STORAGE_KEY: Shared.PHRASE_CUSTOM_STORAGE_KEY
     };
     root.YTBTCore = api;
     if (typeof module !== "undefined" && module.exports) module.exports = api;

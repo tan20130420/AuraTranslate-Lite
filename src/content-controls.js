@@ -37,7 +37,8 @@ function createPlayerControls() {
         data: null, view: "transcript", rows: [], query: "", limit: 200,
         activeCue: null, follow: true, menuOpen: false, styleView: false, panelOpen: false,
         error: "", react: null, dragBound: false,
-        wordfreq: {rows: [], count: 0, loading: false, empty: "暂无字幕", expanded: "", definitions: {}, loadingWord: "", saved: new Set(), limit: 100, computed: false}
+        wordfreq: {rows: [], count: 0, loading: false, empty: "暂无字幕", expanded: "", definitions: {}, loadingWord: "", saved: new Set(), limit: 100, computed: false, cues: [], examplesAll: false},
+        phrase: {rows: [], count: 0, loading: false, empty: "暂无字幕", expanded: "", computed: false, cues: [], examplesAll: false, disabled: false}
     };
     if (globalThis.AuraContentUI) {
         globalThis.AuraContentUI.mountPlayerButton(button, {iconUrl: chrome.runtime.getURL("icons/icon-32.png")});
@@ -126,7 +127,17 @@ function buildPlayerToolsProps(ui) {
             empty: ui.wordfreq.loading ? "正在统计字幕词频..." : (data && data.error) || "暂无字幕",
             expanded: ui.wordfreq.expanded,
             definitions: ui.wordfreq.definitions,
+            examplesAll: ui.wordfreq.examplesAll,
             disabled: state.settings.wordFreqEnabled === false
+        },
+        phrase: {
+            rows: buildPhraseRows(ui),
+            count: ui.phrase.count,
+            loading: ui.phrase.loading,
+            empty: ui.phrase.loading ? "正在扫描字幕短语..." : (data && data.error) || "本视频未发现词库中的短语",
+            expanded: ui.phrase.expanded,
+            examplesAll: ui.phrase.examplesAll,
+            disabled: state.settings.phraseEnabled === false
         },
         onAction: (action, arg) => handlePlayerControlAction(action, arg).catch(showPlayerControlError),
         onSetting: applyPlayerSetting,
@@ -260,6 +271,31 @@ async function handlePlayerControlAction(action, arg) {
         positionPlayerTools();
         await loadPlayerToolCues();
         await computeWordFreq(false);
+    } else if (action === "phrase") {
+        if (state.settings.phraseEnabled === false) return;
+        closePlayerMenu();
+        ui.panelOpen = true;
+        ui.view = "phrase";
+        renderPlayerTools();
+        positionPlayerTools();
+        await loadPlayerToolCues();
+        await computePhrase(false);
+    } else if (action === "ph-reload") {
+        await loadPlayerToolCues();
+        await computePhrase(true);
+    } else if (action === "ph-expand") {
+        ui.phrase.expanded = arg || "";
+        renderPlayerTools();
+    } else if (action === "ph-collapse") {
+        ui.phrase.expanded = "";
+        renderPlayerTools();
+    } else if (action === "ph-examples-all") {
+        ui.phrase.examplesAll = !ui.phrase.examplesAll;
+        renderPlayerTools();
+    } else if (action === "ph-example-seek") {
+        if (arg && arg.cue) seekPlayerCue(arg.cue);
+    } else if (action === "ph-speak") {
+        if (arg) speakWordFreqWord(arg);
     } else if (action === "wf-reload") {
         await loadPlayerToolCues();
         await computeWordFreq(true);
@@ -276,6 +312,12 @@ async function handlePlayerControlAction(action, arg) {
         if (arg) speakWordFreqWord(arg);
     } else if (action === "wf-save") {
         if (arg) await saveWordFreqWord(arg);
+    } else if (action === "wf-examples-all") {
+        ui.wordfreq.examplesAll = !ui.wordfreq.examplesAll;
+        renderPlayerTools();
+    } else if (action === "wf-example-seek") {
+        // 例句跳转：复用字幕列表的 seek 逻辑，但不切换视图、不关闭面板。
+        if (arg && arg.cue) seekPlayerCue(arg.cue);
     } else if (action === "more") {
         ui.limit += 200;
         renderPlayerTranscript();
@@ -330,13 +372,21 @@ function updatePlayerControls() {
             ui.wordfreq.definitions = {};
             ui.wordfreq.saved = new Set();
         }
+        if (ui.phrase) {
+            ui.phrase.computed = false;
+            ui.phrase.phrases = [];
+            ui.phrase.count = 0;
+            ui.phrase.expanded = "";
+        }
         if (ui.panelOpen) loadPlayerToolCues();
         if (ui.panelOpen && ui.view === "wordfreq") computeWordFreq(false);
+        if (ui.panelOpen && ui.view === "phrase") computePhrase(false);
     }
     if (ui.panelOpen) {
         clampPlayerPanel();
         if (ui.view === "transcript") renderPlayerTranscript();
         else if (ui.view === "wordfreq" && ui.wordfreq.computed && !ui.wordfreq.words.length) computeWordFreq(false);
+        else if (ui.view === "phrase" && ui.phrase.computed && !ui.phrase.phrases.length) computePhrase(false);
     }
 }
 
@@ -419,13 +469,109 @@ function renderPlayerTranscript() {
     }
 }
 
+function escapeRegExp(text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildWordFreqExamples(occurrences, cues, forms) {
+    const highlight = Array.from(new Set((forms || []).concat(
+        (occurrences || []).reduce((acc, item) => acc.concat(item.forms || []), [])
+    ))).filter(Boolean).sort((a, b) => b.length - a.length);
+    return (occurrences || []).map((item) => {
+        const cue = cues[item.cueIndex];
+        if (!cue) return null;
+        const text = cue.displaySourceText || cue.sourceText || "";
+        let parts;
+        if (highlight.length) {
+            const re = new RegExp(`\\b(${highlight.map(escapeRegExp).join("|")})\\b`, "gi");
+            parts = [];
+            let last = 0;
+            let match;
+            while ((match = re.exec(text)) !== null) {
+                if (match.index > last) parts.push({hit: false, text: text.slice(last, match.index)});
+                parts.push({hit: true, text: match[0]});
+                last = match.index + match[0].length;
+            }
+            if (last < text.length) parts.push({hit: false, text: text.slice(last)});
+        } else {
+            parts = [{hit: false, text}];
+        }
+        return {
+            cue,
+            cueIndex: item.cueIndex,
+            start: playerTimestamp(cue.startMs),
+            parts
+        };
+    }).filter(Boolean);
+}
+
 function buildWordFreqRows() {
     const wf = playerControls && playerControls.wordfreq;
     if (!wf || !wf.words) return [];
     return wf.words.map((entry) => ({
         ...entry,
-        saved: wf.saved.has(entry.word)
+        saved: wf.saved.has(entry.word),
+        examples: buildWordFreqExamples(entry.occurrences, wf.cues || [], entry.forms)
     }));
+}
+
+function buildPhraseRows() {
+    const ph = playerControls && playerControls.phrase;
+    if (!ph || !ph.phrases) return [];
+    return ph.phrases.map((entry) => ({
+        ...entry,
+        examples: buildWordFreqExamples(entry.occurrences, ph.cues || [], entry.forms)
+    }));
+}
+
+// Read custom entries saved by the options "My phrase library" page. Built-in
+// entries always remain; custom ones are merged by the shared engine.
+function readCustomPhrases(callback) {
+    try {
+        const key = Core.PHRASE_CUSTOM_STORAGE_KEY;
+        if (!key || !chrome || !chrome.storage || !chrome.storage.local) return callback([]);
+        chrome.storage.local.get([key], (result) => callback((result && result[key]) || []));
+    } catch (error) {
+        callback([]);
+    }
+}
+
+function computePhrase(force) {
+    const ui = playerControls;
+    if (!ui) return Promise.resolve();
+    const ph = ui.phrase;
+    if (!force && ph.computed) return Promise.resolve();
+    const cues = Core.getCaptionDisplayCues(playerToolCues());
+    if (!cues.length) {
+        ph.phrases = [];
+        ph.cues = [];
+        ph.count = 0;
+        ph.computed = false;
+        renderPlayerTools();
+        return Promise.resolve();
+    }
+    ph.loading = true;
+    ph.computed = true;
+    renderPlayerTools();
+    return new Promise((resolve) => {
+        readCustomPhrases((custom) => {
+            try {
+                const analysis = Core.phraseLibraryAnalyze
+                    ? Core.phraseLibraryAnalyze(cues, {entries: custom, limit: 200})
+                    : {phrases: []};
+                ph.cues = cues;
+                ph.phrases = analysis.phrases;
+                ph.count = analysis.total;
+            } catch (error) {
+                ph.phrases = [];
+                ph.count = 0;
+                ph.error = error && error.message ? error.message : String(error);
+            }
+            ph.loading = false;
+            renderPlayerTools();
+            resolve();
+        });
+    });
 }
 
 function computeWordFreq(force) {
@@ -436,6 +582,7 @@ function computeWordFreq(force) {
     const cues = Core.getCaptionDisplayCues(playerToolCues());
     if (!cues.length) {
         wf.words = [];
+        wf.cues = [];
         wf.count = 0;
         wf.computed = false;
         renderPlayerTools();
@@ -450,6 +597,7 @@ function computeWordFreq(force) {
         const analysis = Core.wordFreqAnalyze
             ? Core.wordFreqAnalyze(cues, {includeStopWords: includeStop, minLength: 3})
             : {words: []};
+        wf.cues = cues;
         wf.words = analysis.words.slice(0, limit);
         wf.count = analysis.words.length;
     }).catch((error) => {

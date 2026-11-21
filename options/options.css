@@ -1561,3 +1561,13 @@ button.vocabulary-review-start:disabled { opacity: .55; cursor: default; box-sha
     .vocabulary-review-front { font-size: 17px; }
     .vocabulary-review-actions button.review-rate { min-width: 88px; padding: 9px 10px; }
 }
+
+/* My phrase library editor */
+.phrase-editor { display: block; margin: 16px 0; padding: 18px; border: 1px solid var(--border); background: var(--surface); border-radius: 14px; }
+.phrase-editor-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.phrase-editor-grid label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.phrase-editor-grid input, .phrase-editor-grid select { width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--input-border); border-radius: 9px; background: var(--surface); color: var(--ink); font-size: 13px; }
+.phrase-editor-grid input:focus, .phrase-editor-grid select:focus { border-color: var(--accent); }
+.phrase-editor > small { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; }
+.phrase-editor-actions { display: flex; gap: 10px; margin-top: 14px; }
+.vocabulary-word { font-size: 14px; color: var(--ink); }

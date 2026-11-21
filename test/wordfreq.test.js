@@ -100,3 +100,29 @@ test("analyze respects minLength option", () => {
     assert.equal(findWord(result, "dog"), undefined);
     assert.ok(findWord(result, "elephant"));
 });
+
+test("analyze records which cues a word appears in with matched forms", () => {
+    const result = Shared.wordFreqAnalyze(cues(
+        "He runs every morning.",
+        "His running habit is strong.",
+        "She ran yesterday."
+    ));
+    const run = findWord(result, "run");
+    assert.ok(run);
+    assert.equal(run.occurrences.length, 3, "run 应出现在 3 条字幕");
+    assert.deepEqual(run.occurrences.map((item) => item.cueIndex), [0, 1, 2]);
+    assert.ok(run.occurrences[0].forms.includes("runs"));
+    assert.ok(run.occurrences[1].forms.includes("running"));
+    assert.ok(run.occurrences[2].forms.includes("ran"));
+});
+
+test("occurrences sink stop words but keep valid lemmas for examples", () => {
+    const result = Shared.wordFreqAnalyze(cues(
+        "The deal was big. We deal with deals daily."
+    ), {includeStopWords: false});
+    const deal = findWord(result, "deal");
+    assert.ok(deal);
+    assert.equal(deal.occurrences.length, 1, "同一字幕内多次出现只记一条例句");
+    assert.ok(deal.occurrences[0].forms.includes("deal"));
+    assert.ok(deal.occurrences[0].forms.includes("deals"));
+});

@@ -92,6 +92,7 @@ export function settingsPatch(settings) {
         "wordFreqEnabled",
         "wordFreqLimit",
         "wordFreqIncludeStopWords",
+        "phraseEnabled",
         "llmSentenceSegmentationEnabled",
         "asrCorrectionEnabled",
         "showOriginalTechnicalTerms",
@@ -124,6 +125,7 @@ export function settingsPatch(settings) {
         subtitleLookAheadMinutes: Number(s.subtitleLookAheadMinutes || 2),
         wordFreqLimit: Math.max(20, Math.min(500, Number(s.wordFreqLimit) || 100)),
         wordFreqEnabled: s.wordFreqEnabled !== false,
+        phraseEnabled: s.phraseEnabled !== false,
     };
 }
 

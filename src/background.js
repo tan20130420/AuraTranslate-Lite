@@ -12,6 +12,7 @@ if (typeof importScripts === "function") {
         "shared-vocabulary.js",
         "shared-frequency-data.js",
         "shared-wordfreq.js",
+        "shared-phrase-library.js",
         "shared.js",
         "background-core.js",
         "background-subtitles.js",

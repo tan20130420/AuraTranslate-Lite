@@ -187,10 +187,13 @@
         const includeStopWords = Boolean(opts.includeStopWords);
         const counts = new Map();
         const surfaces = new Map();
+        // lemma -> Map<cueIndex, Set<matched surface forms in that cue>>
+        const occurrences = new Map();
         let totalTokens = 0;
 
         const list = Array.isArray(cues) ? cues : [];
-        for (const cue of list) {
+        for (let cueIndex = 0; cueIndex < list.length; cueIndex += 1) {
+            const cue = list[cueIndex];
             const text = cue && (cue.displaySourceText || cue.sourceText || cue.text);
             for (const token of tokenize(text)) {
                 totalTokens += 1;
@@ -200,6 +203,10 @@
                 counts.set(lemma, (counts.get(lemma) || 0) + 1);
                 if (!surfaces.has(lemma)) surfaces.set(lemma, new Set());
                 surfaces.get(lemma).add(token);
+                if (!occurrences.has(lemma)) occurrences.set(lemma, new Map());
+                const byCue = occurrences.get(lemma);
+                if (!byCue.has(cueIndex)) byCue.set(cueIndex, new Set());
+                byCue.get(cueIndex).add(token);
             }
         }
 
@@ -207,12 +214,16 @@
         const words = [];
         for (const [word, count] of counts) {
             const freqRank = rank.has(word) ? rank.get(word) : null;
+            const cueOccurrences = Array.from(occurrences.get(word) || [])
+                .map(([cueIndex, forms]) => ({cueIndex, forms: Array.from(forms).sort()}))
+                .sort((a, b) => a.cueIndex - b.cueIndex);
             words.push({
                 word,
                 count,
                 rank: freqRank,
                 level: freqRank == null ? "unknown" : difficulty(freqRank),
                 forms: Array.from(surfaces.get(word) || []).sort(),
+                occurrences: cueOccurrences,
             });
         }
 
