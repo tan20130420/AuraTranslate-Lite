@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "AuraTranslate Lite",
   "version": "0.5.1",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5klj1Y0uzwsaNUl7ge6K41+s/mOtWmonr1lSeYc+hBvb/re4mF8ehSFxmuM6a94EWhMOXqeVIKcZX/xd096rD++swzhPuqT+qFmJar6ciaF9dIc1/qRG5p87ecSZPwJ+gzGwP/VrB9+V7QAbFi6mcd+7MqFOiCgl5D31E6mKMDuC6x/5YuzvD7Fp8ZA4nrSqW4vcryYppx1XCbK6lzU/somNW5vJzZjUNmt/CIP98sc1Wdft5GHokaIx12wwWYx7Qqrzd9RIlr6GUFMHdl9cAB6QrMdkSaXM0UiTQj3mL43nD3PgLyT660SjTXKjzA90AwbRjv/MNz35uyhTS6csyQIDAQAB",
   "description": "YouTube 双语字幕 + 网页/划词翻译 + 本地生词本与四档复习。免 Key 内置翻译源，数据只存在本机。",
   "icons": {
     "16": "icons/icon-16.png",
