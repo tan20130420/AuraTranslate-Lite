@@ -556,7 +556,11 @@ function updateOverlay() {
     const hasCue = Boolean(cue);
     const statusText = hasCue ? "" : state.statusText;
 
-    overlay.hidden = false;
+    // 画中画打开时按设置隐藏视频页面字幕，避免同一段字幕在两个窗口重复显示。
+    // 仅控制可见性，字幕查找、翻译调度与画中画列表同步仍照常执行。
+    const hideForPip = state.settings.pipHideVideoSubtitle !== false &&
+        typeof ytbtPipIsOpen === "function" && ytbtPipIsOpen();
+    overlay.hidden = hideForPip;
     overlay.classList.toggle("ytbt-no-cue", !hasCue);
     overlay.classList.toggle("ytbt-no-status", !statusText);
     overlay.classList.toggle("ytbt-loading", hasCue && cue.status !== "translated");

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AuraTranslate 全部字幕</title>
+    <link rel="icon" href="../icons/icon-32.png">
+    <script src="../ui/shared/theme-boot.js"></script>
+    <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+<header class="sp-head">
+    <div class="sp-title-row">
+        <strong class="sp-title">全部字幕</strong>
+        <button type="button" class="sp-icon" data-action="refresh" title="重新读取字幕" aria-label="重新读取字幕">↻</button>
+    </div>
+    <p class="sp-video" id="sp-video" hidden></p>
+    <input type="search" class="sp-search" id="sp-search" placeholder="搜索字幕（原文或译文）" aria-label="搜索字幕">
+    <label class="sp-toggle"><input type="checkbox" id="sp-hide-translation"><span>隐藏译文（只看原文，练习英语）</span></label>
+    <div class="sp-meta">
+        <span id="sp-count" role="status">正在读取字幕…</span>
+        <span class="sp-hint">点击字幕跳转播放 · 划词翻译 · 点词条朗读收藏</span>
+    </div>
+</header>
+<main class="sp-list" id="sp-list" tabindex="0" aria-label="全部字幕列表"></main>
+<footer class="sp-foot">
+    <span>在视频页点「查看全部字幕」即可刷新这里的内容</span>
+</footer>
+<div class="sp-card" id="sp-card" hidden></div>
+
+<script src="../src/shared-settings.js"></script>
+<script src="../src/shared-api.js"></script>
+<script src="../src/shared-runtime.js"></script>
+<script src="../src/shared-text.js"></script>
+<script src="../src/shared-captions.js"></script>
+<script src="../src/shared-translation.js"></script>
+<script src="../src/shared-segmentation.js"></script>
+<script src="../src/shared-vocabulary.js"></script>
+<script src="../src/shared-frequency-data.js"></script>
+<script src="../src/shared-wordfreq.js"></script>
+<script src="../src/shared-phrase-library.js"></script>
+<script src="../src/shared.js"></script>
+<script src="sidepanel.js"></script>
+</body>
+</html>

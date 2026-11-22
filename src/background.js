@@ -23,7 +23,8 @@ if (typeof importScripts === "function") {
         "background-mymemory.js",
         "background-dictionary.js",
         "background-cache.js",
-        "background-vocabulary.js"
+        "background-vocabulary.js",
+        "background-sidepanel.js"
     );
 }
 
@@ -64,6 +65,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             const error = chrome.runtime.lastError;
             sendResponse(error ? {ok: false, error: error.message} : {ok: true});
         });
+        return true;
+    }
+
+    if (message.type === "SIDE_PANEL_STORE") {
+        handleSidePanelStore(message, sender)
+            .then(sendResponse)
+            .catch((error) => sendResponse({ok: false, error: error?.message || String(error)}));
+        return true;
+    }
+
+    if (message.type === "SIDE_PANEL_GET") {
+        handleSidePanelGet()
+            .then(sendResponse)
+            .catch((error) => sendResponse({ok: false, error: error?.message || String(error)}));
+        return true;
+    }
+
+    if (message.type === "OPEN_SIDE_PANEL") {
+        handleOpenSidePanel(message, sender)
+            .then(sendResponse)
+            .catch((error) => sendResponse({ok: false, error: error?.message || String(error)}));
+        return true;
+    }
+
+    if (message.type === "SIDE_PANEL_SEEK") {
+        handleSidePanelSeek(message, sender)
+            .then(sendResponse)
+            .catch((error) => sendResponse({ok: false, error: error?.message || String(error)}));
         return true;
     }
 

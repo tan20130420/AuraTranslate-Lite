@@ -81,6 +81,8 @@
         pipShowHeader: true,
         pipFontScale: 1,
         pipOpacity: 0.82,
+        // 画中画打开时自动隐藏视频页面上的字幕，避免同一段字幕显示两遍。
+        pipHideVideoSubtitle: true,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

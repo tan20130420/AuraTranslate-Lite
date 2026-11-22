@@ -16,6 +16,12 @@ export function PipSettings({settings, update, hidden, navigate}) {
                 <span>启用画中画字幕<small>关闭后，播放器菜单里不再显示画中画入口；已打开的窗口会在下次刷新页面后消失。</small></span>
             </label>
             <label className="toggle">
+                <input id="pipHideVideoSubtitle" type="checkbox"
+                       checked={settings.pipHideVideoSubtitle !== false}
+                       onChange={(event) => update({pipHideVideoSubtitle: event.target.checked})}/>
+                <span>画中画打开时隐藏视频字幕<small>打开浮窗后自动隐藏视频页面上的字幕，避免同一段字幕显示两遍；关闭浮窗后自动恢复。关掉此开关可让两边同时显示。</small></span>
+            </label>
+            <label className="toggle">
                 <input id="pipShowHeader" type="checkbox"
                        checked={settings.pipShowHeader !== false}
                        onChange={(event) => update({pipShowHeader: event.target.checked})}/>

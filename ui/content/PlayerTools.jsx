@@ -316,6 +316,7 @@ export function PlayerTools(props) {
                         </MenuRow>
                     )}
                     <MenuRow icon="list" action="transcript" onAction={onAction}>悬浮字幕列表</MenuRow>
+                    <MenuRow icon="summary" action="full-view" trailing="⤢" onAction={onAction}>查看全部字幕</MenuRow>
                     {settings.wordFreqEnabled !== false && <MenuRow icon="book" action="wordfreq" onAction={onAction}>视频词频</MenuRow>}
                     {settings.phraseEnabled !== false && <MenuRow icon="list" action="phrase" onAction={onAction}>短语与俚语</MenuRow>}
                 </div>

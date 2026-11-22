@@ -27,8 +27,12 @@
     }
   },
   "permissions": [
-    "storage"
+    "storage",
+    "sidePanel"
   ],
+  "side_panel": {
+    "default_path": "sidepanel/sidepanel.html"
+  },
   "host_permissions": [
     "https://www.youtube.com/*",
     "https://m.youtube.com/*",
@@ -62,6 +66,7 @@
       "src/background-dictionary.js",
       "src/background-cache.js",
       "src/background-vocabulary.js",
+      "src/background-sidepanel.js",
       "src/background.js"
     ]
   },

@@ -28,11 +28,13 @@ function fixture(t, settings = {}) {
     const stored = {...Core.DEFAULT_SETTINGS, ...settings};
     const listeners = [];
     const calls = [];
+    const runtimeMessageListeners = [];
     win.YTBTCore = Core;
     win.chrome = {
         runtime: {
             getURL: (file) => `https://extension.invalid/${file}`,
             getManifest: () => ({version: "0.3.2"}),
+            onMessage: {addListener(listener) { runtimeMessageListeners.push(listener); }},
             sendMessage(message, callback) {
                 calls.push(message);
                 callback({ok: true, videoId: message.videoId, text: message.cacheOnly ? "" : "[00:00] 视频要点"});
@@ -68,7 +70,7 @@ function fixture(t, settings = {}) {
         {id: "0", startMs: 0, endMs: 9000, sourceText: "Hello world", translatedText: "你好世界", status: "translated"},
         {id: "1", startMs: 10000, endMs: 19000, sourceText: "Second chapter", translatedText: "第二章节", status: "translated"}
     ];
-    return {win, stored, calls, $: (query) => win.document.querySelector(query)};
+    return {win, stored, calls, runtimeMessageListeners, $: (query) => win.document.querySelector(query)};
 }
 
 test("player button survives replacement without duplicate menus and follows external settings", async (t) => {
@@ -422,4 +424,41 @@ test("phrase panel merges custom entries from storage", async (t) => {
     await tick();
     const rows = f.win.buildPhraseRows();
     assert.ok(rows.find((entry) => entry.phrase === "my custom phrase"), "custom entry detected in video");
+});
+
+test("侧边栏跳转消息让视频 seek 到对应时间并继续播放", async (t) => {
+    const f = fixture(t);
+    const video = f.win.document.querySelector("video");
+    let played = 0;
+    video.play = () => { played++; return Promise.resolve(); };
+    f.win.startPlayerControls();
+    const listener = f.runtimeMessageListeners.find((l) => true);
+    assert.ok(listener, "已注册 runtime 消息监听");
+
+    let responded = null;
+    listener({type: "SIDE_PANEL_SEEK_VIDEO", startMs: 10000}, {}, (r) => { responded = r; });
+    assert.equal(video.currentTime, (10000 - 20) / 1000, "跳转到字幕起点（含 20ms 余量）");
+    assert.equal(played, 1, "继续播放");
+    assert.equal(responded.ok, true, "回执成功");
+
+    // 不相关的消息不被处理
+    let other = "untouched";
+    listener({type: "SOMETHING_ELSE"}, {}, (r) => { other = r; });
+    assert.equal(other, "untouched", "其他消息忽略");
+});
+
+test("侧边栏跳转消息对无效时间或缺失视频安全返回失败", async (t) => {
+    const f = fixture(t);
+    f.win.startPlayerControls();
+    const listener = f.runtimeMessageListeners[f.runtimeMessageListeners.length - 1];
+    let r1 = null;
+    listener({type: "SIDE_PANEL_SEEK_VIDEO", startMs: -5}, {}, (r) => { r1 = r; });
+    assert.equal(r1.ok, false, "拒绝无效时间");
+
+    f.win.state.video = null;
+    let r2 = null;
+    const video = f.win.document.querySelector("video");
+    video.remove();
+    listener({type: "SIDE_PANEL_SEEK_VIDEO", startMs: 1000}, {}, (r) => { r2 = r; });
+    assert.equal(r2.ok, false, "无视频时失败");
 });

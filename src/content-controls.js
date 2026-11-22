@@ -6,6 +6,7 @@ var playerControlsTimer = null;
 
 function startPlayerControls() {
     if (IS_DRIVE_PLAYER || playerControlsTimer) return;
+    bindSidePanelSeekMessages();
     updatePlayerControls();
     playerControlsTimer = setInterval(updatePlayerControls, 250);
     document.addEventListener("pointerdown", (event) => {
@@ -15,6 +16,34 @@ function startPlayerControls() {
         if (playerControls) playerControls.panel.style.removeProperty("left");
         if (playerControls) playerControls.panel.style.removeProperty("top");
         updatePlayerControls();
+    });
+}
+
+// 全部字幕侧边栏点击某行时，background 会把时间点转发到这里。
+// 跳转到对应字幕并继续播放；content script 作用域内只注册一次。
+var sidePanelSeekBound = false;
+function bindSidePanelSeekMessages() {
+    if (sidePanelSeekBound) return;
+    if (!chrome || !chrome.runtime || !chrome.runtime.onMessage) return;
+    sidePanelSeekBound = true;
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+        if (!message || message.type !== "SIDE_PANEL_SEEK_VIDEO") return;
+        const startMs = Number(message.startMs);
+        const video = state.video || document.querySelector("video");
+        if (!Number.isFinite(startMs) || startMs < 0 || !video) {
+            sendResponse({ok: false});
+            return;
+        }
+        try {
+            // 末尾留 20ms 余量，避免落在上一句尾部。
+            video.currentTime = Math.max(0, startMs - 20) / 1000;
+            handleSeek();
+            const playResult = video.play && video.play();
+            if (playResult && typeof playResult.catch === "function") playResult.catch(() => {});
+            sendResponse({ok: true});
+        } catch (error) {
+            sendResponse({ok: false, error: (error && error.message) || String(error)});
+        }
     });
 }
 
@@ -323,6 +352,11 @@ async function handlePlayerControlAction(action, arg) {
     } else if (action === "more") {
         ui.limit += 200;
         renderPlayerTranscript();
+    } else if (action === "full-view") {
+        // 独立的全部字幕侧边栏：先把当前字幕推给后台，再打开侧边栏。
+        // 不建覆盖层、不暂停视频，播放完全不受影响。
+        closePlayerMenu();
+        await openFullTranscript();
     } else if (action === "load-captions") {
         await loadPlayerToolCues();
     } else if (action === "pip-toggle") {
@@ -489,6 +523,62 @@ function renderPlayerTranscript() {
         const row = list && list.querySelector('.ytbt-cue-row[aria-current="true"]');
         if (list && row) list.scrollTop = Math.max(0, row.offsetTop - list.offsetTop - list.clientHeight / 3);
     }
+}
+
+// --- 全部字幕侧边栏 ---
+// 独立 Document，字幕带时间码、可划词翻译/朗读/收藏。视频页面不覆盖、不暂停，
+// 播放进度完全不受影响。这里只负责把当前字幕推给后台，再请求打开侧边栏。
+function buildSidePanelPayload() {
+    const ui = playerControls;
+    if (!ui) return null;
+    const cues = Core.getCaptionDisplayCues(playerToolCues()).map((cue) => ({
+        id: cue.id,
+        startMs: cue.startMs,
+        endMs: cue.endMs,
+        sourceText: cue.sourceText || "",
+        displaySourceText: cue.displaySourceText || "",
+        translatedText: cue.translatedText || "",
+        status: cue.status || ""
+    }));
+    const config = Core.resolveTranslationConfig(state.settings);
+    return {
+        type: "OPEN_SIDE_PANEL",
+        videoId: getUrlVideoId() || state.videoId || "",
+        videoTitle: document.title || "",
+        pageUrl: location.href,
+        sourceLanguage: state.settings.sourceLanguage || (config && config.sourceLanguage) || "en",
+        targetLanguage: state.settings.targetLanguage || "zh-CN",
+        cues
+    };
+}
+
+async function openFullTranscript() {
+    const ui = playerControls;
+    if (!ui) return;
+    // 先确保字幕已读取，再推送完整内容。
+    await loadPlayerToolCues();
+    const payload = buildSidePanelPayload();
+    if (!payload) return;
+    if (!payload.cues.length) {
+        showPlayerControlError("字幕还未加载完成，请稍后重试。");
+        return;
+    }
+    try {
+        const response = await Core.sendRuntimeMessage(chrome.runtime, payload, 10000);
+        if (!response || response.ok === false) {
+            showPlayerControlError((response && response.error) || "打开侧边栏失败，请重试。");
+        }
+    } catch (error) {
+        showPlayerControlError(error);
+    }
+}
+
+function closeFullTranscript() {
+    // 侧边栏在独立 Document 中自行关闭，视频页面无需状态。
+}
+
+function renderFullTranscript() {
+    // 兼容旧调用：侧边栏内容变化时由 sidepanel.js 主动读取，这里不再渲染覆盖层。
 }
 
 function escapeRegExp(text) {

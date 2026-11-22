@@ -66,6 +66,7 @@ function normalizeSettings(settings) {
     merged.sourceLanguage = merged.sourceLanguage || Core.DEFAULT_SETTINGS.sourceLanguage;
     merged.subtitlePosition = normalizeSubtitlePosition(merged.subtitlePosition);
     merged.pipEnabled = merged.pipEnabled !== false;
+    merged.pipHideVideoSubtitle = merged.pipHideVideoSubtitle !== false;
     merged.pipShowHeader = merged.pipShowHeader !== false;
     const pipScale = Number(merged.pipFontScale);
     merged.pipFontScale = Number.isFinite(pipScale) ? Math.min(1.8, Math.max(0.6, pipScale)) : 1;
@@ -199,7 +200,9 @@ function applySettings() {
         state.overlay.style.setProperty("--ytbt-subtitle-color", state.settings.subtitleColor);
         state.overlay.style.setProperty("--ytbt-background-opacity", String(state.settings.subtitleBackgroundOpacity));
         state.overlay.dataset.displayMode = state.settings.subtitleDisplayMode;
-        state.overlay.hidden = !state.settings.subtitleEnabled;
+        const hideForPip = state.settings.pipHideVideoSubtitle !== false &&
+            typeof ytbtPipIsOpen === "function" && ytbtPipIsOpen();
+        state.overlay.hidden = !state.settings.subtitleEnabled || hideForPip;
         applyOverlayPosition();
     }
     if (typeof syncPlayerControlsSettings === "function") syncPlayerControlsSettings();
