@@ -105,7 +105,9 @@ function buildPlayerToolsProps(ui) {
             fontScale: state.settings.fontScale,
             subtitleBackgroundOpacity: state.settings.subtitleBackgroundOpacity,
             subtitleColor: state.settings.subtitleColor,
-            wordFreqEnabled: state.settings.wordFreqEnabled !== false
+            wordFreqEnabled: state.settings.wordFreqEnabled !== false,
+            pipEnabled: state.settings.pipEnabled !== false,
+            pipOpen: typeof ytbtPipIsOpen === "function" && ytbtPipIsOpen()
         },
         transcript: {
             rows: ui.rows,
@@ -321,7 +323,27 @@ async function handlePlayerControlAction(action, arg) {
     } else if (action === "more") {
         ui.limit += 200;
         renderPlayerTranscript();
-    } else if (action === "load-captions") await loadPlayerToolCues();
+    } else if (action === "load-captions") {
+        await loadPlayerToolCues();
+    } else if (action === "pip-toggle") {
+        if (state.settings.pipEnabled === false) return;
+        if (typeof ytbtPipToggle !== "function") {
+            showPlayerControlError("画中画模块未加载。");
+            return;
+        }
+        try {
+            await ytbtPipToggle({
+                showHeader: state.settings.pipShowHeader !== false,
+                fontScale: state.settings.pipFontScale,
+                opacity: state.settings.pipOpacity,
+                onClose: () => { if (playerControls) renderPlayerTools(); }
+            });
+            renderPlayerTools();
+        } catch (error) {
+            showPlayerControlError(error);
+        }
+        closePlayerMenu();
+    }
 }
 
 function updatePlayerControls() {

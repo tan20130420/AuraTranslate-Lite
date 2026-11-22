@@ -3,6 +3,7 @@ import {useSettings} from "./useSettings";
 import {TranslationSettings} from "./TranslationSettings";
 import {GeneralSettings} from "./GeneralSettings";
 import {SelectionSettings} from "./SelectionSettings";
+import {PipSettings} from "./PipSettings";
 import {WordFreqSettings} from "./WordFreqSettings";
 import {PhraseLibrary} from "./PhraseLibrary";
 import {Vocabulary} from "./Vocabulary";
@@ -11,6 +12,7 @@ import {Icon} from "../shared/Icon";
 const PAGES = [
     ["realtime-api", "实时字幕", "视频双语字幕"],
     ["immersive-api", "沉浸式翻译", "网页翻译"],
+    ["pip-settings", "画中画字幕", "拖到第二屏的字幕窗口"],
     ["selection-settings", "划词翻译", "所选文字与上下文"],
     ["wordfreq-settings", "视频词频", "统计字幕里的高频词"],
     ["phrase-library", "我的词库", "管理短语、习语与俚语"],
@@ -85,7 +87,7 @@ export function OptionsApp() {
         navigate(PAGES[(next + PAGES.length) % PAGES.length][0], true);
     }
 
-    const ICONS = ["subtitles", "webpage", "translate", "book", "plus", "book", "settings"];
+    const ICONS = ["subtitles", "webpage", "subtitles", "translate", "book", "plus", "book", "settings"];
 
     return (
         <main className="page">
@@ -136,6 +138,8 @@ export function OptionsApp() {
                                     immersive
                                     hidden={page !== "immersive-api"}
                                 />
+                                <PipSettings settings={settings} update={update}
+                                             hidden={page !== "pip-settings"} navigate={navigate}/>
                                 <SelectionSettings settings={settings} update={update}
                                                    hidden={page !== "selection-settings"} navigate={navigate}/>
                                 <WordFreqSettings settings={settings} update={update}

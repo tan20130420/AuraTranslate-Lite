@@ -309,6 +309,12 @@ export function PlayerTools(props) {
                         <span className="ytbt-switch" aria-hidden="true"/>
                     </label>
                     <MenuRow icon="settings" action="style" trailing="›" onAction={onAction}>字幕样式</MenuRow>
+                    {settings.pipEnabled !== false && (
+                        <MenuRow icon="subtitles" action="pip-toggle" trailing={settings.pipOpen ? "●" : "›"}
+                                 onAction={onAction}>
+                            {settings.pipOpen ? "关闭画中画字幕" : "打开画中画字幕"}
+                        </MenuRow>
+                    )}
                     <MenuRow icon="list" action="transcript" onAction={onAction}>悬浮字幕列表</MenuRow>
                     {settings.wordFreqEnabled !== false && <MenuRow icon="book" action="wordfreq" onAction={onAction}>视频词频</MenuRow>}
                     {settings.phraseEnabled !== false && <MenuRow icon="list" action="phrase" onAction={onAction}>短语与俚语</MenuRow>}

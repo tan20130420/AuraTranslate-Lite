@@ -649,3 +649,190 @@ test("浏览器不支持语音时词卡无喇叭按钮但不影响释义", async
     assert.equal(tip.querySelector(".ytbt-wordtip-speak"), null, "不支持语音时不显示喇叭");
     assert.match(tip.textContent, /测试释义/, "释义仍正常显示");
 });
+
+// --- 画中画窗口里的悬停取词 ---
+
+function pipLine(text) {
+    const element = {
+        className: "ytbt-pip-en",
+        closest(selector) {
+            if (String(selector).includes(".ytbt-pip-en")) return element;
+            if (String(selector).includes(".ytbt-pip-lines")) return element;
+            return null;
+        },
+        getBoundingClientRect() {
+            return {top: 20, bottom: 42, left: 30, right: 200, width: 170, height: 22};
+        },
+    };
+    const node = {nodeType: 3, textContent: text, parentElement: element};
+    return {node, element};
+}
+
+function makePipWindow(caretTarget, created, listeners) {
+    const doc = {
+        body: {appendChild(el) { created.push(el); }},
+        caretRangeFromPoint() {
+            return {startContainer: caretTarget.node, startOffset: caretTarget.offset};
+        },
+        createRange() {
+            return {
+                startContainer: null,
+                setStart(node, offset) { this.startContainer = node; this.startOffset = offset; },
+                setEnd() {},
+                getBoundingClientRect() {
+                    return {top: 20, bottom: 42, left: 80, right: 130, width: 50, height: 22};
+                },
+            };
+        },
+        createElement(tag) {
+            const el = {
+                tagName: String(tag).toUpperCase(),
+                className: "",
+                hidden: true,
+                disabled: false,
+                style: {},
+                children: [],
+                textContent: "",
+                isConnected: true,
+                attrs: {},
+                handlers: {},
+                _classes: new Set(),
+                get classList() {
+                    const classes = this._classes;
+                    return {
+                        add(name) { classes.add(name); },
+                        remove(name) { classes.delete(name); },
+                        contains(name) { return classes.has(name); },
+                    };
+                },
+                appendChild(child) {
+                    this.children.push(child);
+                    this.textContent += child.textContent || "";
+                    return child;
+                },
+                querySelector(selector) {
+                    const cls = String(selector).replace(/^\./, "");
+                    if (this.className === cls) return this;
+                    for (const child of this.children) {
+                        const found = child.querySelector?.(selector);
+                        if (found) return found;
+                    }
+                    return null;
+                },
+                addEventListener(type, handler) { (this.handlers[type] = this.handlers[type] || []).push(handler); },
+                setAttribute(name, value) { this.attrs[name] = value; },
+                getBoundingClientRect() { return {top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0}; },
+            };
+            return el;
+        },
+        addEventListener(type, handler, capture) { listeners.push([type, handler, capture]); },
+        removeEventListener(type, handler, capture) {
+            const index = listeners.findIndex((item) => item[0] === type && item[1] === handler && item[2] === capture);
+            if (index >= 0) listeners.splice(index, 1);
+        },
+    };
+    return {
+        document: doc,
+        innerWidth: 960,
+        innerHeight: 260,
+        addEventListener(type, handler, capture) { listeners.push([type, handler, capture]); },
+        removeEventListener(type, handler, capture) {
+            const index = listeners.findIndex((item) => item[0] === type && item[1] === handler && item[2] === capture);
+            if (index >= 0) listeners.splice(index, 1);
+        },
+    };
+}
+
+test("画中画字幕里能取词、出词卡并自动英文朗读", async () => {
+    const text = "She stayed resilient after the setback.";
+    const {node} = pipLine(text);
+    const f = load({
+        video: fakeVideo(),
+        lookup: speechLookup("resilient"),
+        withSpeech: true,
+    });
+    const created = [];
+    const listeners = [];
+    const pipWindow = makePipWindow({node, offset: text.indexOf("resilient") + 3}, created, listeners);
+    const ctx = f.api.YTBTHover.bindPip(pipWindow);
+    assert.ok(ctx, "应为画中画创建独立取词上下文");
+    assert.ok(ctx.isPip);
+
+    f.api.hoverApplyZone("subtitle", {clientX: 100, clientY: 30}, ctx);
+    await wait(360);
+
+    const tip = created.find((el) => el.className === "ytbt-wordtip");
+    assert.ok(tip, "词卡应挂到画中画文档，而不是主页面");
+    assert.match(tip.textContent, /resilient/);
+    assert.match(tip.textContent, /测试释义/);
+    assert.ok(f.speech.spoken.some((item) => item.text === "resilient"), "画中画取词也应自动英文朗读");
+    assert.equal(f.video.paused, true, "停在画中画字幕上同样暂停视频");
+});
+
+test("关闭画中画会解绑取词事件并收起词卡，不影响主页面", async () => {
+    const text = "She stayed resilient after the setback.";
+    const {node} = pipLine(text);
+    const f = load({video: fakeVideo(), lookup: speechLookup("resilient"), withSpeech: true});
+    const created = [];
+    const listeners = [];
+    const pipWindow = makePipWindow({node, offset: text.indexOf("resilient") + 3}, created, listeners);
+    const ctx = f.api.YTBTHover.bindPip(pipWindow);
+    f.api.hoverApplyZone("subtitle", {clientX: 100, clientY: 30}, ctx);
+    await wait(360);
+    const tip = created.find((el) => el.className === "ytbt-wordtip");
+    assert.ok(tip && !tip.hidden);
+    assert.ok(listeners.length > 0, "画中画应有自己的事件监听");
+
+    // 主页面词卡不受画中画影响。
+    f.api.hoverHideTip();
+    assert.equal(tip.hidden, false, "主页面收起词卡不应收起画中画的词卡");
+
+    f.api.YTBTHover.unbindPip();
+    assert.equal(tip.hidden, true, "关闭画中画应收起词卡");
+    assert.equal(listeners.length, 0, "事件监听应全部解绑");
+});
+
+// --- 画中画字幕列表行：悬停暂停 + 取词 ---
+
+function pipCueRow(text) {
+    const source = {
+        className: "ytbt-cue-source",
+        closest(selector) {
+            if (String(selector).includes(".ytbt-cue-source")) return source;
+            if (String(selector).includes(".ytbt-cue-row")) return row;
+            if (String(selector).includes(".ytbt-pip-lines") || String(selector).includes(".ytbt-lines")) return row;
+            return null;
+        },
+        getBoundingClientRect() {
+            return {top: 20, bottom: 42, left: 30, right: 200, width: 170, height: 22};
+        },
+    };
+    const row = {
+        className: "ytbt-cue-row",
+        closest(selector) { return String(selector).includes(".ytbt-cue-row") ? row : null; },
+        getBoundingClientRect() {
+            return {top: 12, bottom: 52, left: 20, right: 220, width: 200, height: 40};
+        },
+    };
+    const node = {nodeType: 3, textContent: text, parentElement: source};
+    return {node, source, row};
+}
+
+test("画中画列表行悬停进入 transcript 区，暂停视频并取词出卡", async () => {
+    const text = "We figured it out together.";
+    const {node, source} = pipCueRow(text);
+    const f = load({video: fakeVideo(), lookup: speechLookup("figured"), withSpeech: true});
+    const created = [];
+    const listeners = [];
+    const pipWindow = makePipWindow({node, offset: text.indexOf("figured") + 3}, created, listeners);
+    const ctx = f.api.YTBTHover.bindPip(pipWindow);
+    assert.equal(ctx.transcriptSelector, ".ytbt-cue-row", "画中画上下文启用列表行暂停区");
+    assert.equal(f.api.hoverZoneOf(source, ctx), "transcript", "列表行判定为 transcript 区");
+
+    f.api.hoverApplyZone("transcript", {clientX: 100, clientY: 30, target: source}, ctx);
+    await wait(360);
+    const tip = created.find((el) => el.className === "ytbt-wordtip");
+    assert.ok(tip, "列表行里的英文也能出词卡");
+    assert.match(tip.textContent, /figured/);
+    assert.equal(f.video.paused, true, "悬停列表行同样暂停视频");
+});

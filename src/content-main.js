@@ -65,6 +65,12 @@ function normalizeSettings(settings) {
     merged.targetLanguage = merged.targetLanguage || Core.DEFAULT_SETTINGS.targetLanguage;
     merged.sourceLanguage = merged.sourceLanguage || Core.DEFAULT_SETTINGS.sourceLanguage;
     merged.subtitlePosition = normalizeSubtitlePosition(merged.subtitlePosition);
+    merged.pipEnabled = merged.pipEnabled !== false;
+    merged.pipShowHeader = merged.pipShowHeader !== false;
+    const pipScale = Number(merged.pipFontScale);
+    merged.pipFontScale = Number.isFinite(pipScale) ? Math.min(1.8, Math.max(0.6, pipScale)) : 1;
+    const pipOpacity = Number(merged.pipOpacity);
+    merged.pipOpacity = Number.isFinite(pipOpacity) ? Math.min(1, Math.max(0.3, pipOpacity)) : 0.82;
     return merged;
 }
 
@@ -197,6 +203,13 @@ function applySettings() {
         applyOverlayPosition();
     }
     if (typeof syncPlayerControlsSettings === "function") syncPlayerControlsSettings();
+    if (typeof ytbtPipApplyOptions === "function") {
+        ytbtPipApplyOptions({
+            showHeader: state.settings.pipShowHeader !== false,
+            fontScale: state.settings.pipFontScale,
+            opacity: state.settings.pipOpacity
+        });
+    }
 }
 
 function injectPageBridge() {

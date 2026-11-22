@@ -93,6 +93,10 @@ export function settingsPatch(settings) {
         "wordFreqLimit",
         "wordFreqIncludeStopWords",
         "phraseEnabled",
+        "pipEnabled",
+        "pipShowHeader",
+        "pipFontScale",
+        "pipOpacity",
         "llmSentenceSegmentationEnabled",
         "asrCorrectionEnabled",
         "showOriginalTechnicalTerms",
@@ -126,6 +130,10 @@ export function settingsPatch(settings) {
         wordFreqLimit: Math.max(20, Math.min(500, Number(s.wordFreqLimit) || 100)),
         wordFreqEnabled: s.wordFreqEnabled !== false,
         phraseEnabled: s.phraseEnabled !== false,
+        pipEnabled: s.pipEnabled !== false,
+        pipShowHeader: s.pipShowHeader !== false,
+        pipFontScale: Math.max(0.6, Math.min(1.8, Number(s.pipFontScale) || 1)),
+        pipOpacity: Math.max(0.3, Math.min(1, Number(s.pipOpacity) || 0.82)),
     };
 }
 

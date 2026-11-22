@@ -76,6 +76,11 @@
         wordFreqIncludeStopWords: false,
         // 视频短语/俚语列表：从字幕中识别词库里的短语、习语、搭配与俚语。
         phraseEnabled: true,
+        // 文档画中画字幕窗口：把双语字幕同步到可拖到第二屏的独立窗口。
+        pipEnabled: true,
+        pipShowHeader: true,
+        pipFontScale: 1,
+        pipOpacity: 0.82,
         selectionToolbar: DEFAULT_SELECTION_TOOLBAR,
         targetLanguage: "zh-CN",
         sourceLanguage: "en",

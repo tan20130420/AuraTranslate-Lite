@@ -509,6 +509,36 @@ function renderOverlayText(cn, en, status) {
     if (parts.status.textContent !== status) parts.status.textContent = status;
 }
 
+// --- Document Picture-in-Picture subtitle mirror ---
+function pipTimeLabel(ms) {
+    const seconds = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds / 60) % 60;
+    return (hours ? `${hours}:` : "") +
+        `${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function syncPipSubtitle(cn, en, timeMs) {
+    if (typeof ytbtPipWrite !== "function" ||
+        typeof ytbtPipIsOpen !== "function" || !ytbtPipIsOpen()) {
+        return;
+    }
+    let durationMs = 0;
+    try {
+        const video = state.video || document.querySelector("video");
+        if (video && Number.isFinite(video.duration) && video.duration > 0) durationMs = video.duration * 1000;
+    } catch (_) { /* 无视频时只显示当前时间 */ }
+    const title = typeof ytbtPipVideoTitle === "function"
+        ? ytbtPipVideoTitle() : String(document.title || "");
+    ytbtPipWrite({
+        title,
+        time: pipTimeLabel(timeMs) + (durationMs ? " / " + pipTimeLabel(durationMs) : ""),
+        progress: durationMs ? Math.min(100, Math.max(0, (timeMs / durationMs) * 100)) : 0
+    });
+    // 画中画现在是完整字幕列表：每帧同步数据与当前行高亮。
+    if (typeof ytbtPipSyncList === "function") ytbtPipSyncList(timeMs);
+}
+
 function updateOverlay() {
     const overlay = state.overlay;
     if (!overlay || (!state.overlayView && !state.overlayParts)) {
@@ -517,6 +547,7 @@ function updateOverlay() {
 
     if (!state.settings.subtitleEnabled) {
         overlay.hidden = true;
+        syncPipSubtitle("", "", getCurrentTimeMs());
         return;
     }
 
@@ -531,11 +562,10 @@ function updateOverlay() {
     overlay.classList.toggle("ytbt-loading", hasCue && cue.status !== "translated");
 
     if (hasCue) {
-        renderOverlayText(
-            cue.translatedText || (cue.status === "translated" ? "" : fallbackTextForCue(cue)),
-            cue.displaySourceText || cue.sourceText || "",
-            statusText
-        );
+        const cn = cue.translatedText || (cue.status === "translated" ? "" : fallbackTextForCue(cue));
+        const en = cue.displaySourceText || cue.sourceText || "";
+        renderOverlayText(cn, en, statusText);
+        syncPipSubtitle(cn, en, timeMs);
 
         if ((cue.status === "pending" || cue.status === "unprepared") && Date.now() - state.lastUrgentScheduleAt > URGENT_RESCHEDULE_MS) {
             state.lastUrgentScheduleAt = Date.now();
@@ -543,6 +573,7 @@ function updateOverlay() {
         }
     } else {
         renderOverlayText("", "", statusText);
+        syncPipSubtitle("", "", timeMs);
     }
 }
 

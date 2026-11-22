@@ -13,6 +13,7 @@ const root = path.resolve(__dirname, "..");
 const SUB_PAGES = [
   "realtime-api",
   "immersive-api",
+  "pip-settings",
   "selection-settings",
   "wordfreq-settings",
   "phrase-library",

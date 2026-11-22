@@ -93,6 +93,7 @@
         "src/content-overlay.js",
         "src/content-hover.js",
         "src/content-controls.js",
+        "src/content-pip.js",
         "src/content-main.js"
       ],
       "css": [
